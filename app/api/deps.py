@@ -9,8 +9,7 @@ from app.services.pipeline import SpeechAnalysisPipeline
 @lru_cache(maxsize=1)
 def get_speech_pipeline() -> SpeechAnalysisPipeline:
     """
-    Создаёт и кеширует единственный экземпляр пайплайна на процесс.
-    Модель Whisper тоже создаётся один раз.
+    Создаёт и кеширует единственный экземпляр пайплайна.
     """
     extractor = FfmpegAudioExtractor()
     transcriber = LocalWhisperTranscriber()
