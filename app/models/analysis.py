@@ -1,5 +1,8 @@
-from typing import List, Dict, Any, Literal
+from typing import List, Dict, Any, Literal, Optional
 from pydantic import BaseModel
+
+# Импортируем новую модель
+from app.models.gigachat import GigaChatAnalysis
 
 
 class FillerWordsStats(BaseModel):
@@ -17,10 +20,6 @@ class PausesStats(BaseModel):
 
 
 class PhraseStats(BaseModel):
-    """
-    Статистика по фразам — последовательностям речи между паузами.
-    """
-
     count: int
     avg_words: float
     avg_duration_sec: float
@@ -28,56 +27,34 @@ class PhraseStats(BaseModel):
     max_words: int
     min_duration_sec: float
     max_duration_sec: float
-
-    # Качественная оценка длины фраз:
-    # short_phrases  — в среднем очень короткие фразы;
-    # balanced       — сбалансированная длина;
-    # long_phrases   — в среднем очень длинные фразы.
     length_classification: str
-
-    # Качественная оценка вариативности длительности фраз:
-    # insufficient_data  — данных мало для оценки;
-    # uniform            — фразы по длительности довольно равномерны;
-    # moderately_variable — умеренная вариативность;
-    # highly_variable    — сильно разная длительность фраз.
     rhythm_variation: str
 
 
 class AdviceItem(BaseModel):
-    """
-    Структурированный совет по одной из категорий анализа.
-    """
-
-    # Категория, к которой относится совет
     category: Literal["speech_rate", "filler_words", "pauses", "phrasing"]
-
-    # Условная "строгость" совета
     severity: Literal["info", "suggestion", "warning"]
-
-    # Краткий заголовок (для UI)
     title: str
-
-    # Наблюдение по текущей записи
     observation: str
-
-    # Рекомендация по улучшению
     recommendation: str
 
 
 class AnalysisResult(BaseModel):
+    # Базовые метрики
     duration_sec: float
-
-    # Время, когда спикер реально говорит (без "тишины" и шумных пауз)
     speaking_time_sec: float
-    # Доля времени говорения: speaking_time_sec / duration_sec
     speaking_ratio: float
-
     words_total: int
     words_per_minute: float
 
+    # Статистика
     filler_words: FillerWordsStats
     pauses: PausesStats
     phrases: PhraseStats
 
+    # Рекомендации
     advice: List[AdviceItem]
     transcript: str
+
+    # Расширенный анализ (опционально)
+    gigachat_analysis: Optional[GigaChatAnalysis] = None
