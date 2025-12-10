@@ -41,26 +41,18 @@ class LocalWhisperTranscriber:
         logger.info(f"Whisper model loaded successfully")
 
     def transcribe(self, audio_path: Path) -> Transcript:
-<<<<<<< HEAD
-        # Стандартная транскрипция (без таймингов слов)
-        return self._transcribe_basic(audio_path)
-
-    def transcribe_with_word_timings(self, audio_path: Path) -> Transcript:
         """
         Транскрибация с таймингами для каждого слова.
         faster-whisper поддерживает word_timestamps=True
         """
-=======
-        logger.info(f"Transcribing audio: {audio_path}")
+        logger.info(f"Transcribing audio with word timings: {audio_path}")
 
->>>>>>> feature/gigachat-integration
         # segments — генератор, info — объект с метаданными
         segments_iter, info = self.model.transcribe(
             str(audio_path),
             beam_size=5,
-<<<<<<< HEAD
-            word_timestamps=True,  # ← Ключевой параметр!
-            vad_filter=True
+            word_timestamps=True,  # ← Ключевой параметр для таймингов слов!
+            vad_filter=True,  # Фильтрация голосовой активности
         )
 
         segments: List[TranscriptSegment] = []
@@ -93,40 +85,11 @@ class LocalWhisperTranscriber:
 
         full_text = " ".join(texts).strip()
 
+        logger.info(f"Transcription complete: {len(segments)} segments, {
+                    len(all_word_timings)} word timings")
+
         return Transcript(
             text=full_text,
             segments=segments,
             word_timings=all_word_timings
         )
-
-    def _transcribe_basic(self, audio_path: Path) -> Transcript:
-        """
-        Базовая транскрипция без таймингов слов (для обратной совместимости).
-        """
-        segments_iter, info = self.model.transcribe(
-            str(audio_path),
-            beam_size=5,
-=======
-            vad_filter=True,  # Включить фильтрацию голосовой активности
->>>>>>> feature/gigachat-integration
-        )
-
-        segments: List[TranscriptSegment] = []
-        texts: List[str] = []
-
-        for seg in segments_iter:
-            segments.append(
-                TranscriptSegment(
-                    start=float(seg.start),
-                    end=float(seg.end),
-                    text=seg.text,
-                )
-            )
-            texts.append(seg.text)
-
-        full_text = " ".join(texts).strip()
-
-        logger.info(f"Transcription complete: {len(segments)} segments, {
-                    len(full_text)} characters")
-
-        return Transcript(text=full_text, segments=segments)

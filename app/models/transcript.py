@@ -17,7 +17,7 @@ class TranscriptSegment(BaseModel):
     start: float
     end: float
     text: str
-    words: List[WordTiming] = []  # ← НОВОЕ: тайминги слов внутри сегмента
+    words: List[WordTiming] = []  # ← Тайминги слов внутри сегмента
 
 
 class Transcript(BaseModel):

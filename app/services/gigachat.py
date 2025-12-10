@@ -2,7 +2,8 @@ import os
 import json
 import logging
 import uuid
-from typing import Optional, Dict, Any, List  # Optional должен быть импортирован
+import time
+from typing import Optional, Dict, Any, List
 import httpx
 from pydantic import ValidationError
 
@@ -78,7 +79,6 @@ class GigaChatClient:
 
         # Проверяем, не истек ли текущий токен
         if self._access_token and self._token_expires_at:
-            import time
             if time.time() < self._token_expires_at - 60:  # 60 секунд до истечения
                 logger.debug("Using cached access token")
                 return
@@ -197,14 +197,6 @@ class GigaChatClient:
                 await self.authenticate()
             except GigaChatError as e:
                 logger.warning(f"Failed to authenticate with GigaChat: {e}")
-
-                # Если ошибка 429, логируем и возвращаем None
-                if "rate limit" in str(e).lower() or "429" in str(e):
-                    logger.warning(
-                        "GigaChat rate limit exceeded, skipping analysis")
-                else:
-                    logger.error(f"GigaChat authentication error: {e}")
-
                 return None
 
         try:
@@ -216,17 +208,18 @@ class GigaChatClient:
                 "messages": [
                     {
                         "role": "system",
-                        "content": """Ты эксперт по публичным выступлениям и ораторскому искусству. 
-                        Анализируй речь по предоставленным метрикам и транскрипту. 
-                        Дай развернутый, персонализированный анализ. 
-                        Отвечай в формате JSON со следующей структурой:
+                        "content": """Ты эксперт по публичным выступлениям. 
+                        Анализируй речь по предоставленным метрикам. 
+                        Верни ответ ТОЛЬКО в формате JSON без дополнительного текста.
+                        
+                        Формат JSON:
                         {
-                            "overall_assessment": "строка - общая оценка",
-                            "strengths": ["массив строк - сильные стороны"],
-                            "areas_for_improvement": ["массив строк - зоны роста"],
-                            "detailed_recommendations": ["массив строк - конкретные рекомендации"],
-                            "key_insights": ["массив строк - ключевые инсайты"],
-                            "confidence_score": число от 0 до 1
+                          "overall_assessment": "текст",
+                          "strengths": ["пункт1", "пункт2"],
+                          "areas_for_improvement": ["пункт1", "пункт2"],
+                          "detailed_recommendations": ["пункт1", "пункт2"],
+                          "key_insights": ["пункт1", "пункт2"],
+                          "confidence_score": число от 0 до 1
                         }"""
                     },
                     {
@@ -235,7 +228,8 @@ class GigaChatClient:
                     }
                 ],
                 "temperature": 0.7,
-                "max_tokens": self.max_tokens
+                "max_tokens": min(self.max_tokens, 1500),  # Ограничиваем длину
+                "response_format": {"type": "json_object"}
             }
 
             headers = {
@@ -247,11 +241,6 @@ class GigaChatClient:
             logger.info("Sending analysis request to GigaChat...")
 
             response = await self.client.post(chat_url, json=request_data, headers=headers)
-
-            if response.status_code == 429:
-                logger.warning(
-                    "GigaChat rate limit exceeded for analysis request")
-                return None
 
             if response.status_code != 200:
                 logger.error(f"GigaChat API error {
@@ -265,44 +254,46 @@ class GigaChatClient:
                 return None
 
             content = result["choices"][0]["message"]["content"]
+            logger.info(f"GigaChat response received: {
+                        len(content)} characters")
 
-            logger.info("GigaChat analysis received successfully")
+            # Очищаем и парсим JSON
+            cleaned_content = self._clean_json_response(content)
 
             try:
-                parsed_content = json.loads(content)
+                parsed_content = json.loads(cleaned_content)
+
+                # Валидируем обязательные поля
+                required_fields = ["overall_assessment", "strengths", "areas_for_improvement",
+                                   "detailed_recommendations", "key_insights", "confidence_score"]
+
+                for field in required_fields:
+                    if field not in parsed_content:
+                        parsed_content[field] = "" if field != "confidence_score" else 0.5
+
                 return GigaChatAnalysis(**parsed_content)
+
             except (json.JSONDecodeError, ValidationError) as e:
-                logger.warning(
-                    f"Failed to parse GigaChat response as JSON: {e}")
+                logger.warning(f"Failed to parse GigaChat response: {e}")
+                logger.debug(f"Raw content: {content[:500]}...")
 
-                # Пробуем извлечь JSON из текста
-                import re
-                json_match = re.search(r'\{.*\}', content, re.DOTALL)
-                if json_match:
-                    try:
-                        json_str = json_match.group(0)
-                        parsed_content = json.loads(json_str)
-                        return GigaChatAnalysis(**parsed_content)
-                    except:
-                        logger.warning("Could not extract JSON from response")
-
-                # Если не удалось распарсить JSON, создаем структурированный ответ
-                logger.info("Creating structured response from text")
+                # Создаем базовый ответ
                 return GigaChatAnalysis(
-                    overall_assessment=content[:500],
-                    strengths=["Анализ выполнен, но в текстовом формате"],
-                    areas_for_improvement=[],
+                    overall_assessment="Анализ выполнен, но формат ответа не соответствует ожиданиям",
+                    strengths=["Получены метрики анализа речи"],
+                    areas_for_improvement=[
+                        "Требуется корректировка формата ответа GigaChat"],
                     detailed_recommendations=[
-                        f"Полный текст анализа: {content[:1000]}"],
-                    key_insights=["Ответ GigaChat не в формате JSON"],
-                    confidence_score=0.3
+                        "Используйте базовый анализ для детальных метрик"],
+                    key_insights=["GigaChat вернул невалидный JSON формат"],
+                    confidence_score=0.2
                 )
 
         except httpx.RequestError as e:
             logger.error(f"GigaChat API request failed: {e}")
             return None
         except Exception as e:
-            logger.error(f"Error processing GigaChat response: {e}")
+            logger.error(f"Unexpected error in GigaChat analysis: {e}")
             return None
 
     def _create_analysis_prompt(self, analysis_result: AnalysisResult) -> str:
@@ -371,3 +362,195 @@ class GigaChatClient:
             logger.debug("GigaChat HTTP клиент закрыт")
         except Exception as e:
             logger.debug(f"Ошибка закрытия HTTP клиента: {e}")
+
+    async def analyze_speech_with_timings(self, timed_result_dict: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Отправляет результаты анализа с таймингами в GigaChat.
+        """
+        if not settings.gigachat_enabled:
+            logger.info("GigaChat detailed analysis is disabled")
+            return None
+
+        # Пробуем аутентифицироваться, если нужно
+        if not self._access_token:
+            try:
+                await self.authenticate()
+            except GigaChatError as e:
+                logger.warning(f"Failed to authenticate with GigaChat: {e}")
+                return None
+
+        start_time = time.time()
+
+        try:
+            prompt = self._create_detailed_analysis_prompt(timed_result_dict)
+
+            chat_url = f"{self.api_url}/chat/completions"
+            request_data = {
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": """Ты эксперт по публичным выступлениям, ораторскому искусству и анализу речи. 
+                        Твоя задача - анализировать выступление с учетом ТОЧНЫХ ВРЕМЕННЫХ МЕТОК.
+                        
+                        Требования к анализу:
+                        1. Привязывай все рекомендации к конкретным секундам выступления
+                        2. Выявляй временные паттерны и закономерности
+                        3. Определяй критические моменты (поворотные точки, кульминации)
+                        4. Анализируй стиль речи и его уместность
+                        5. Оценивай предполагаемую вовлеченность аудитории по времени
+                        6. Составь временную шкалу улучшений с упражнениями
+                        
+                        Отвечай ТОЛЬКО в указанном JSON формате."""
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                "temperature": 0.7,
+                "max_tokens": self.max_tokens * 2,
+                "response_format": {"type": "json_object"}
+            }
+
+            headers = {
+                "Authorization": f"Bearer {self._access_token}",
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+
+            logger.info("Sending detailed analysis request to GigaChat...")
+
+            response = await self.client.post(chat_url, json=request_data, headers=headers)
+
+            if response.status_code != 200:
+                logger.error(f"GigaChat API error {
+                             response.status_code}: {response.text}")
+                processing_time = time.time() - start_time
+                return self._create_error_response("GigaChat API error", processing_time)
+
+            result = response.json()
+
+            if "choices" not in result or len(result["choices"]) == 0:
+                logger.error("No choices in GigaChat response")
+                processing_time = time.time() - start_time
+                return self._create_error_response("No choices in response", processing_time)
+
+            content = result["choices"][0]["message"]["content"]
+            processing_time = time.time() - start_time
+
+            logger.info(f"GigaChat detailed analysis received in {
+                        processing_time:.1f} seconds")
+
+            try:
+                parsed_content = json.loads(content)
+                parsed_content["processing_time_sec"] = processing_time
+                return parsed_content
+
+            except (json.JSONDecodeError, ValidationError) as e:
+                logger.warning(
+                    f"Failed to parse GigaChat response as JSON: {e}")
+                processing_time = time.time() - start_time
+                return self._create_error_response(f"JSON parse error", processing_time)
+
+        except httpx.RequestError as e:
+            logger.error(f"GigaChat API request failed: {e}")
+            processing_time = time.time() - start_time
+            return self._create_error_response(f"Request error: {str(e)}", processing_time)
+        except Exception as e:
+            logger.error(f"Error processing GigaChat response: {e}")
+            processing_time = time.time() - start_time
+            return self._create_error_response(f"Processing error: {str(e)}", processing_time)
+
+    def _create_detailed_analysis_prompt(self, timed_result: Dict[str, Any]) -> str:
+        """Создает детализированный промпт для GigaChat с учетом таймингов"""
+        # Извлекаем данные из словаря
+        duration_sec = timed_result.get("duration_sec", 0)
+        speaking_time_sec = timed_result.get("speaking_time_sec", 0)
+        speaking_ratio = timed_result.get("speaking_ratio", 0)
+        words_total = timed_result.get("words_total", 0)
+        words_per_minute = timed_result.get("words_per_minute", 0)
+        transcript = timed_result.get("transcript", "")
+
+        # Извлекаем timeline
+        timeline = timed_result.get("timeline", {})
+        fillers = timeline.get("fillers", [])
+        pauses = timeline.get("pauses", [])
+        phrases = timeline.get("phrases", [])
+        suspicious_moments = timeline.get("suspicious_moments", [])
+
+        # Базовые метрики
+        filler_count = len(fillers)
+        pause_count = len(pauses)
+        phrase_count = len(phrases)
+        problem_count = len(suspicious_moments)
+
+        # Рассчитываем статистику
+        filler_per_100 = (filler_count / words_total *
+                          100) if words_total > 0 else 0
+        problematic_pauses = sum(
+            1 for p in pauses if p.get("is_excessive", False))
+
+        prompt = f"""
+Ты эксперт по публичным выступлениям и ораторскому искусству.
+Анализируй речь по предоставленным метрикам, транскрипту и ДЕТАЛИЗИРОВАННЫМ ТАЙМИНГАМ.
+
+=== ОСНОВНЫЕ МЕТРИКИ ===
+Длительность: {duration_sec:.1f} секунд
+Время говорения: {speaking_time_sec:.1f} секунд
+Коэффициент говорения: {speaking_ratio:.2%}
+Темп речи: {words_per_minute:.1f} слов/минуту
+Общее количество слов: {words_total}
+Слов-паразитов: {filler_count} ({filler_per_100:.1f} на 100 слов)
+Пауз: {pause_count} (проблемных: {problematic_pauses})
+Фраз: {phrase_count}
+Проблемных моментов: {problem_count}
+
+=== ТРАНСКРИПТ (первые 2500 символов) ===
+{transcript[:2500]}{'... [текст сокращен]' if len(transcript) > 2500 else ''}
+
+=== ИНСТРУКЦИИ ДЛЯ АНАЛИЗА ===
+1. Проанализируй выступление с привязкой ко времени
+2. Определи критические моменты (кульминация, поворотные точки)
+3. Выяви временные паттерны (когда возникают проблемы, когда речь наиболее эффективна)
+4. Оцени стиль речи и его уместность
+5. Предположи реакцию аудитории в разные моменты
+6. Составь план улучшений с временной привязкой
+
+=== ТРЕБОВАНИЯ К ФОРМАТУ ОТВЕТА ===
+Ответ должен быть в формате JSON со следующей структурой:
+{{
+  "overall_assessment": "Общая оценка (2-3 абзаца)",
+  "strengths": ["сильная сторона 1", "сильная сторона 2", ...],
+  "areas_for_improvement": ["зона роста 1", "зона роста 2", ...],
+  "detailed_recommendations": ["рекомендация 1", "рекомендация 2", ...],
+  "key_insights": ["инсайт 1", "инсайт 2", ...],
+  "confidence_score": 0.85,
+  "time_based_analysis": [],
+  "temporal_patterns": [],
+  "improvement_timeline": [],
+  "critical_moments": []
+}}
+
+ВАЖНО:
+1. Все временные метки указывай в секундах
+2. Будь максимально конкретен в рекомендациях
+3. Привязывай все советы к конкретным моментам времени
+"""
+        return prompt
+
+    def _create_error_response(self, error_message: str, processing_time: float) -> Dict[str, Any]:
+        """Создает ответ об ошибке"""
+        return {
+            "overall_assessment": f"Анализ выполнен с ограничениями: {error_message}",
+            "strengths": ["Получены базовые метрики анализа"],
+            "areas_for_improvement": ["Требуется исправление в работе GigaChat API"],
+            "detailed_recommendations": ["Попробуйте использовать базовый анализ или проверьте настройки API"],
+            "key_insights": [f"Ошибка: {error_message}"],
+            "confidence_score": 0.1,
+            "processing_time_sec": processing_time,
+            "metadata": {
+                "has_error": True,
+                "error_message": error_message
+            }
+        }

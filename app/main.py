@@ -11,6 +11,11 @@ from app.core.config import settings
 from app.core.exceptions import SpeechCoachException
 from app.core.logging_config import setup_logging
 
+from app.core.exceptions import (
+    SpeechCoachException, FileValidationError, FileTooLargeError,
+    UnsupportedFileTypeError, TranscriptionError, AnalysisError, GigaChatError
+)
+
 # Настраиваем логирование
 setup_logging(log_level="INFO")
 
@@ -66,6 +71,58 @@ async def global_exception_handler(request: Request, exc: Exception):
             "detail": "Internal server error",
             "error_type": exc.__class__.__name__,
             "message": str(exc)
+        },
+    )
+
+
+@app.exception_handler(FileTooLargeError)
+async def file_too_large_handler(request: Request, exc: FileTooLargeError):
+    logger.warning(f"File too large: {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail,
+            "error_type": "FileTooLargeError",
+            "max_size_mb": 100
+        },
+    )
+
+
+@app.exception_handler(UnsupportedFileTypeError)
+async def unsupported_file_type_handler(request: Request, exc: UnsupportedFileTypeError):
+    logger.warning(f"Unsupported file type: {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail,
+            "error_type": "UnsupportedFileTypeError",
+            "allowed_extensions": [".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv", ".wmv", ".m4v"]
+        },
+    )
+
+
+@app.exception_handler(TranscriptionError)
+async def transcription_error_handler(request: Request, exc: TranscriptionError):
+    logger.error(f"Transcription error: {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": "Ошибка распознавания речи. Убедитесь, что в видео есть четкая речь.",
+            "error_type": "TranscriptionError",
+            "internal_error": exc.detail
+        },
+    )
+
+
+@app.exception_handler(AnalysisError)
+async def analysis_error_handler(request: Request, exc: AnalysisError):
+    logger.error(f"Analysis error: {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": "Ошибка анализа речи. Попробуйте другой файл.",
+            "error_type": "AnalysisError",
+            "internal_error": exc.detail
         },
     )
 

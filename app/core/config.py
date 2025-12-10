@@ -58,8 +58,18 @@ class Settings(BaseSettings):
         alias="ALLOWED_VIDEO_EXTENSIONS"
     )
 
+    # Настройки кеширования
     cache_enabled: bool = Field(default=True, alias="CACHE_ENABLED")
     cache_ttl: int = Field(default=3600, alias="CACHE_TTL")  # 1 час
+    cache_dir: str = Field(default="cache/analysis", alias="CACHE_DIR")
+
+    # Настройки логирования
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    log_file: Optional[str] = Field(default=None, alias="LOG_FILE")
+    log_max_size_mb: int = Field(default=10, alias="LOG_MAX_SIZE_MB")
+    log_backup_count: int = Field(default=5, alias="LOG_BACKUP_COUNT")
+
+    # Настройки производительности
     metrics_enabled: bool = Field(default=True, alias="METRICS_ENABLED")
     max_concurrent_analyses: int = Field(
         default=5, alias="MAX_CONCURRENT_ANALYSES")
@@ -109,6 +119,30 @@ class Settings(BaseSettings):
                     validated.append(ext.lower())
             return validated
 
+        return v
+
+    @validator("log_max_size_mb")
+    def validate_log_max_size(cls, v):
+        if v <= 0:
+            raise ValueError("LOG_MAX_SIZE_MB must be positive")
+        if v > 100:  # 100 MB max
+            raise ValueError("LOG_MAX_SIZE_MB cannot exceed 100")
+        return v
+
+    @validator("log_backup_count")
+    def validate_log_backup_count(cls, v):
+        if v < 0:
+            raise ValueError("LOG_BACKUP_COUNT cannot be negative")
+        if v > 20:
+            raise ValueError("LOG_BACKUP_COUNT cannot exceed 20")
+        return v
+
+    @validator("max_concurrent_analyses")
+    def validate_max_concurrent_analyses(cls, v):
+        if v <= 0:
+            raise ValueError("MAX_CONCURRENT_ANALYSES must be positive")
+        if v > 10:
+            raise ValueError("MAX_CONCURRENT_ANALYSES cannot exceed 10")
         return v
 
 

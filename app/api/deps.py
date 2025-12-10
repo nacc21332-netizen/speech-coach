@@ -52,14 +52,6 @@ def get_gigachat_client() -> Optional[GigaChatClient]:
 
 @lru_cache(maxsize=1)
 def get_speech_pipeline() -> SpeechAnalysisPipeline:
-<<<<<<< HEAD
-    """
-    Создаёт и кеширует единственный экземпляр пайплайна.
-    """
-    extractor = FfmpegAudioExtractor()
-    transcriber = LocalWhisperTranscriber()
-    analyzer = SpeechAnalyzer()
-=======
     """Создает пайплайн анализа"""
     transcriber = get_transcriber()
     analyzer = get_analyzer()
@@ -67,9 +59,33 @@ def get_speech_pipeline() -> SpeechAnalysisPipeline:
 
     logger.info(f"Создание пайплайна анализа")
 
->>>>>>> feature/gigachat-integration
     return SpeechAnalysisPipeline(
         transcriber=transcriber,
         analyzer=analyzer,
         gigachat_client=gigachat_client,
     )
+
+
+# Новые зависимости для расширенного анализа
+@lru_cache(maxsize=1)
+def get_advanced_pipeline():
+    """Создает расширенный пайплайн анализа с таймингами"""
+    try:
+        from app.services import AdvancedSpeechAnalyzer
+        from app.services.pipeline_advanced import AdvancedSpeechAnalysisPipeline
+
+        transcriber = get_transcriber()
+        analyzer = AdvancedSpeechAnalyzer()
+        gigachat_client = get_gigachat_client()
+
+        logger.info("Создание расширенного пайплайна анализа")
+
+        return AdvancedSpeechAnalysisPipeline(
+            transcriber=transcriber,
+            analyzer=analyzer,
+            gigachat_client=gigachat_client,
+            include_timings=True
+        )
+    except ImportError as e:
+        logger.error(f"Не удалось создать расширенный пайплайн: {e}")
+        raise

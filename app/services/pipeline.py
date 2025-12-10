@@ -10,17 +10,7 @@ from fastapi import UploadFile
 
 from app.services.audio_extractor_advanced import AdvancedFfmpegAudioExtractor, TimeoutException
 from app.services.transcriber import Transcriber
-from app.services.analyzer import SpeechAnalyzer
-<<<<<<< HEAD
-from app.models.timed_analysis import TimedAnalysisResult
-
-
-class SpeechAnalysisPipeline:
-    """
-    Координирует анализ речи из видео.
-    """
-
-=======
+from app.services.analyzer import SpeechAnalyzer, EnhancedAnalysisResult
 from app.services.gigachat import GigaChatClient
 from app.services.metrics_collector import MetricsCollector
 from app.services.cache import AnalysisCache, cache_analysis
@@ -38,7 +28,6 @@ logger = logging.getLogger(__name__)
 
 
 class SpeechAnalysisPipeline:
->>>>>>> feature/gigachat-integration
     def __init__(
         self,
         transcriber: Transcriber,
@@ -46,49 +35,14 @@ class SpeechAnalysisPipeline:
         gigachat_client: Optional[GigaChatClient] = None,
         enable_cache: bool = True,
         enable_metrics: bool = True,
+        include_timings: bool = True,  # Новая опция
     ):
         self.audio_extractor = AdvancedFfmpegAudioExtractor()
         self.transcriber = transcriber
         self.analyzer = analyzer
         self.gigachat_client = gigachat_client
+        self.include_timings = include_timings
 
-<<<<<<< HEAD
-    async def analyze(self, file: UploadFile) -> TimedAnalysisResult:
-        """
-        Основной метод анализа видео.
-        Возвращает полный результат с временными метками.
-        """
-        temp_video_path, temp_audio_path = await self._prepare_files(file)
-
-        try:
-            # 1. Извлекаем аудио
-            self.audio_extractor.extract(temp_video_path, temp_audio_path)
-
-            # 2. Транскрибируем с таймингами слов
-            transcript = self._transcribe_with_timings(temp_audio_path)
-
-            # 3. Анализируем
-            result = self.analyzer.analyze(
-                transcript, audio_path=temp_audio_path)
-            return result
-
-        finally:
-            self._cleanup_files(temp_video_path, temp_audio_path)
-
-    def _transcribe_with_timings(self, audio_path: Path):
-        """
-        Транскрибирует аудио с таймингами слов.
-        Использует word_timestamps если доступно.
-        """
-        if hasattr(self.transcriber, 'transcribe_with_word_timings'):
-            return self.transcriber.transcribe_with_word_timings(audio_path)
-        else:
-            # Резервный вариант
-            return self.transcriber.transcribe(audio_path)
-
-    async def _prepare_files(self, file: UploadFile) -> tuple[Path, Path]:
-        """Подготавливает временные файлы."""
-=======
         # Инициализация кеша
         self.cache = None
         if enable_cache:
@@ -103,9 +57,9 @@ class SpeechAnalysisPipeline:
                 Path("logs/metrics.jsonl"))
 
     @cache_analysis(ttl_hours=1)
-    async def analyze_upload(self, file: UploadFile) -> AnalysisResult:
+    async def analyze_upload(self, file: UploadFile) -> EnhancedAnalysisResult:
         """
-        Анализирует загруженное видео с поддержкой кеширования и метрик.
+        Анализирует загруженное видео с поддержкой таймингов.
         """
         # Начинаем сбор метрик
         if self.metrics_collector:
@@ -128,7 +82,7 @@ class SpeechAnalysisPipeline:
                 if self.metrics_collector:
                     self.metrics_collector.end_subtask("audio_extraction")
 
-                # 2) Транскрибация
+                # 2) Транскрибация (с таймингами слов)
                 if self.metrics_collector:
                     self.metrics_collector.start_subtask("transcription")
 
@@ -137,7 +91,7 @@ class SpeechAnalysisPipeline:
                 if self.metrics_collector:
                     self.metrics_collector.end_subtask("transcription")
 
-                # 3) Анализ
+                # 3) Анализ с таймингами
                 if self.metrics_collector:
                     self.metrics_collector.start_subtask("analysis")
 
@@ -249,7 +203,6 @@ class SpeechAnalysisPipeline:
 
     async def _create_temp_files(self, file: UploadFile) -> tuple[Path, Path]:
         """Создает временные файлы для обработки"""
->>>>>>> feature/gigachat-integration
         suffix = Path(file.filename or "video").suffix or ".mp4"
 
         # Создаем временный видеофайл
@@ -259,29 +212,6 @@ class SpeechAnalysisPipeline:
 
         # Сохраняем загруженный файл
         await self._save_upload_to_path(file, temp_video_path)
-<<<<<<< HEAD
-        temp_audio_path = temp_video_path.with_suffix(".wav")
-
-        return temp_video_path, temp_audio_path
-
-    @staticmethod
-    async def _save_upload_to_path(upload: UploadFile, dst: Path) -> None:
-        """Сохраняет загруженный файл."""
-        upload.file.seek(0)
-        with dst.open("wb") as out_file:
-            shutil.copyfileobj(upload.file, out_file)
-        await upload.close()
-
-    @staticmethod
-    def _cleanup_files(*paths: Path) -> None:
-        """Удаляет временные файлы."""
-        for path in paths:
-            try:
-                if path.exists():
-                    os.remove(path)
-            except OSError:
-                pass
-=======
 
         # Путь для аудиофайла
         temp_audio_path = temp_video_path.with_suffix(".wav")
@@ -313,8 +243,8 @@ class SpeechAnalysisPipeline:
             raise AnalysisError(f"Не удалось извлечь аудио: {str(e)}")
 
     async def _transcribe_audio(self, audio_path: Path):
-        """Транскрибирует аудио"""
-        logger.info("Транскрибация аудио...")
+        """Транскрибирует аудио (с таймингами слов)"""
+        logger.info("Транскрибация аудио с таймингами слов...")
 
         try:
             # Валидация аудиофайла перед транскрибацией
@@ -327,8 +257,12 @@ class SpeechAnalysisPipeline:
             if not transcript.segments or not transcript.text.strip():
                 logger.warning("Транскрипт пуст или содержит только пробелы")
 
-            logger.info(f"Транскрибация завершена: {
-                        len(transcript.segments)} сегментов")
+            if transcript.word_timings:
+                logger.info(f"Транскрибация завершена: {len(transcript.segments)} сегментов, {
+                            len(transcript.word_timings)} таймингов слов")
+            else:
+                logger.warning("Транскрибация не вернула тайминги слов")
+
             return transcript
 
         except Exception as e:
@@ -336,16 +270,24 @@ class SpeechAnalysisPipeline:
             raise TranscriptionError(
                 f"Не удалось транскрибировать аудио: {str(e)}")
 
-    async def _analyze_speech(self, transcript, audio_path: Path) -> AnalysisResult:
-        """Анализирует речь"""
-        logger.info("Анализ метрик речи...")
+    async def _analyze_speech(self, transcript, audio_path: Path) -> EnhancedAnalysisResult:
+        """Анализирует речь с таймингами"""
+        logger.info("Анализ метрик речи с таймингами...")
 
         try:
-            result = self.analyzer.analyze(transcript, audio_path=audio_path)
+            result = self.analyzer.analyze(
+                transcript,
+                audio_path=audio_path,
+                include_timings=self.include_timings
+            )
 
             # Дополнительная проверка результата
             if result.words_total == 0:
                 logger.warning("В результате анализа 0 слов")
+
+            if result.timed_data.word_timings_count > 0:
+                logger.info(f"Анализ с таймингами: {result.timed_data.word_timings_count} слов, {len(
+                    result.timed_data.filler_words_detailed)} слов-паразитов, {len(result.timed_data.pauses_detailed)} пауз")
 
             logger.info(f"Анализ завершен: {result.words_total} слов, темп: {
                         result.words_per_minute:.1f} WPM")
@@ -355,31 +297,34 @@ class SpeechAnalysisPipeline:
             logger.error(f"Ошибка анализа речи: {e}")
             raise AnalysisError(f"Не удалось проанализировать речь: {str(e)}")
 
-    async def _enhance_with_gigachat(self, result: AnalysisResult) -> AnalysisResult:
+    async def _enhance_with_gigachat(self, result: EnhancedAnalysisResult) -> EnhancedAnalysisResult:
         """Добавляет анализ от GigaChat"""
         logger.info("Запрос расширенного анализа через GigaChat...")
 
         try:
-            gigachat_analysis = await self.gigachat_client.analyze_speech(result)
+            # Создаем базовый AnalysisResult для GigaChat
+            base_result = AnalysisResult(
+                duration_sec=result.duration_sec,
+                speaking_time_sec=result.speaking_time_sec,
+                speaking_ratio=result.speaking_ratio,
+                words_total=result.words_total,
+                words_per_minute=result.words_per_minute,
+                filler_words=result.filler_words,
+                pauses=result.pauses,
+                phrases=result.phrases,
+                advice=result.advice,
+                transcript=result.transcript,
+                gigachat_analysis=None
+            )
+
+            gigachat_analysis = await self.gigachat_client.analyze_speech(base_result)
 
             if gigachat_analysis:
                 logger.info(f"GigaChat анализ получен: {
                             gigachat_analysis.overall_assessment[:100]}...")
 
-                # Создаем новый результат с анализом GigaChat
-                result = AnalysisResult(
-                    duration_sec=result.duration_sec,
-                    speaking_time_sec=result.speaking_time_sec,
-                    speaking_ratio=result.speaking_ratio,
-                    words_total=result.words_total,
-                    words_per_minute=result.words_per_minute,
-                    filler_words=result.filler_words,
-                    pauses=result.pauses,
-                    phrases=result.phrases,
-                    advice=result.advice,
-                    transcript=result.transcript,
-                    gigachat_analysis=gigachat_analysis
-                )
+                # Обновляем результат с анализом GigaChat
+                result.gigachat_analysis = gigachat_analysis
             else:
                 logger.warning("GigaChat вернул пустой результат")
 
@@ -415,4 +360,3 @@ class SpeechAnalysisPipeline:
             except Exception as e:
                 logger.warning(
                     f"Не удалось удалить временный файл {path}: {e}")
->>>>>>> feature/gigachat-integration

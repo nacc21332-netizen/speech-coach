@@ -1,14 +1,15 @@
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Literal, Optional
 import re
 import wave
 import struct
 import math
 from pathlib import Path
+from pydantic import BaseModel
 
 from app.models.transcript import Transcript, TranscriptSegment, WordTiming
-from app.models.timed_analysis import (
-    TimedAnalysisResult, TimedFillerWord, TimedPause, SpeechRateWindow,
-    EmotionalPeak, AdviceItem, FillerWordsStats, PausesStats, PhraseStats
+from app.models.analysis import (
+    AnalysisResult, FillerWordsStats, PausesStats,
+    PhraseStats, AdviceItem
 )
 
 # --------------------
@@ -21,45 +22,32 @@ MAX_COMFORT_WPM = 180.0
 LONG_PAUSE_SEC = 2.5
 SILENCE_FACTOR = 0.35
 PAUSE_SEGMENT_TIME_TOLERANCE = 0.25
+SPEECH_RATE_WINDOW_SIZE = 30.0  # секунд
+SPEECH_RATE_WINDOW_STEP = 15.0  # секунд
 
 # --------------------
 # Слова-паразиты
 # --------------------
 
 FILLER_DEFINITIONS: List[Tuple[str, str]] = [
-<<<<<<< HEAD
-    # Русские
-    ("э-э", r"\bэ+([- ]э+)*\b"),
-    ("ну", r"\bну\b"),
-    ("вот", r"\bвот\b"),
-=======
     # Русские звучания
     ("э-э", r"\bэ+([- ]э+)*\b"),
     ("ну", r"\bну\b"),
     ("вот", r"\bвот\b"),
 
     # Русские конструкции
->>>>>>> feature/gigachat-integration
     ("как бы", r"\bкак бы\b"),
     ("типа", r"\bтипа\b"),
     ("то есть", r"\bто есть\b"),
     ("значит", r"\bзначит\b"),
     ("получается", r"\bполучается\b"),
 
-<<<<<<< HEAD
-    # Английские
-    ("uh", r"\buh+\b"),
-    ("um", r"\bum+\b"),
-    ("er", r"\ber+\b"),
-    ("ah", r"\bah+\b"),
-=======
     # Английские звучания
     ("uh", r"\buh+\b"),
     ("um", r"\bum+\b"),
     ("er", r"\ber+\b"),
 
     # Английские конструкции
->>>>>>> feature/gigachat-integration
     ("like", r"\blike\b"),
     ("so", r"\bso\b"),
     ("you know", r"\byou know\b"),
@@ -72,54 +60,95 @@ COMPILED_FILLERS: List[Tuple[str, re.Pattern]] = [
 ]
 
 
-class SpeechAnalyzer:
-<<<<<<< HEAD
-    """
-    Анализирует транскрипт и формирует метрики/советы с временными метками.
-    """
+# --------------------
+# Модели для таймингов
+# --------------------
 
-=======
->>>>>>> feature/gigachat-integration
+class TimedFillerWord(BaseModel):
+    """Слово-паразит с временной меткой"""
+    word: str
+    timestamp: float
+    exact_word: str
+    confidence: Optional[float] = None
+
+
+class TimedPause(BaseModel):
+    """Пауза с контекстом"""
+    start: float
+    end: float
+    duration: float
+    type: Literal["natural", "long", "awkward", "dramatic"]
+    before_word: Optional[str] = None
+    after_word: Optional[str] = None
+
+
+class SpeechRateWindow(BaseModel):
+    """Темп речи в временном окне"""
+    window_start: float
+    window_end: float
+    word_count: int
+    words_per_minute: float
+    speaking_time: float
+
+
+class TimedAnalysisData(BaseModel):
+    """Дополнительные данные с таймингами"""
+    filler_words_detailed: List[TimedFillerWord] = []
+    pauses_detailed: List[TimedPause] = []
+    speech_rate_windows: List[SpeechRateWindow] = []
+    word_timings_count: int = 0
+    speaking_activity: List[Dict[str, float]] = []
+
+
+class EnhancedAnalysisResult(BaseModel):
+    """Расширенный результат анализа с таймингами"""
+    # Основные метрики из AnalysisResult
+    duration_sec: float
+    speaking_time_sec: float
+    speaking_ratio: float
+    words_total: int
+    words_per_minute: float
+    filler_words: FillerWordsStats
+    pauses: PausesStats
+    phrases: PhraseStats
+    advice: List[AdviceItem]
+    transcript: str
+    gigachat_analysis: Optional[Any] = None
+
+    # Детализированные данные с таймингами
+    timed_data: TimedAnalysisData = TimedAnalysisData()
+
+
+class SpeechAnalyzer:
     def analyze(
         self,
         transcript: Transcript,
         audio_path: Path | None = None,
-<<<<<<< HEAD
-    ) -> TimedAnalysisResult:
+        include_timings: bool = True,
+    ) -> EnhancedAnalysisResult:
         """
-        Основной метод анализа, возвращает полный результат с таймингами.
+        Анализирует речь с возможностью включения таймингов.
         """
-        # Базовые расчеты
-        duration_sec, speaking_time_sec, words_total = self._calculate_basic_metrics(
-            transcript)
-        words_per_minute = self._calculate_wpm(words_total, speaking_time_sec)
-        speaking_ratio = speaking_time_sec / duration_sec if duration_sec > 0 else 0.0
+        # Базовый анализ
+        base_result = self._analyze_basic(transcript, audio_path)
 
-        # Анализ слов-паразитов
-        filler_total, filler_detail = self._count_fillers(transcript.text)
-        filler_stats = self._build_filler_stats(
-            filler_total, filler_detail, words_total)
-        filler_detailed = self._find_fillers_with_timings(transcript)
+        # Дополнительный анализ с таймингами
+        timed_data = TimedAnalysisData()
 
-        # Анализ пауз
-        raw_pauses = self._extract_raw_pauses(transcript.segments)
-        if audio_path and raw_pauses:
-            filtered_pauses = self._filter_noisy_pauses(
-                audio_path, raw_pauses, transcript.segments)
-        else:
-            filtered_pauses = raw_pauses
+        if include_timings and transcript.word_timings:
+            timed_data = self._analyze_with_timings(transcript)
 
-        pauses_stats = self._summarize_pauses(filtered_pauses)
-        pauses_detailed = self._analyze_pauses_with_context(
-            filtered_pauses, transcript.segments)
+        return EnhancedAnalysisResult(
+            **base_result.dict(),
+            timed_data=timed_data
+        )
 
-        # Анализ фраз
-        phrase_stats = self._build_phrase_stats(
-            transcript.segments, filtered_pauses)
-
-        # Генерация советов
-=======
+    def _analyze_basic(
+        self,
+        transcript: Transcript,
+        audio_path: Path | None = None,
     ) -> AnalysisResult:
+        """Базовый анализ без таймингов"""
         segments = transcript.segments
         if not segments:
             return self._empty_analysis_result(transcript.text or "")
@@ -144,20 +173,9 @@ class SpeechAnalyzer:
         filler_total, filler_detail = self._count_fillers(full_text)
         pauses_stats = self._summarize_pauses(pauses_filtered)
         phrase_stats = self._build_phrase_stats(segments, pauses_filtered)
->>>>>>> feature/gigachat-integration
         advice = self._generate_advice(
             words_per_minute, filler_total, words_total, pauses_stats, phrase_stats)
 
-<<<<<<< HEAD
-        # Дополнительные метрики с таймингами
-        speech_windows = self._calculate_speech_windows(transcript)
-        speaking_activity = self._build_speaking_activity(transcript)
-        phrase_boundaries = self._extract_phrase_boundaries(
-            transcript.segments)
-
-        # Конвертация сегментов для JSON
-        segments_dict = self._convert_segments_to_dict(transcript.segments)
-=======
         # Статистика слов-паразитов
         filler_stats = FillerWordsStats(
             total=filler_total,
@@ -170,9 +188,8 @@ class SpeechAnalyzer:
                 if filler_detail.get(name, 0) > 0
             ],
         )
->>>>>>> feature/gigachat-integration
 
-        return TimedAnalysisResult(
+        return AnalysisResult(
             duration_sec=round(duration_sec, 2),
             speaking_time_sec=round(speaking_time_sec, 2),
             speaking_ratio=round(speaking_ratio, 3),
@@ -184,57 +201,154 @@ class SpeechAnalyzer:
             phrases=phrase_stats,
 
             advice=advice,
-<<<<<<< HEAD
-
-            filler_words_detailed=filler_detailed,
-            pauses_detailed=pauses_detailed,
-            speech_rate_windows=speech_windows,
-            emotional_peaks=[],  # TODO: добавить позже
-            phrase_boundaries=phrase_boundaries,
-
-            speaking_activity=speaking_activity,
-            transcript_segments=segments_dict,
-            transcript_text=transcript.text
-        )
-
-    # -------------------------------------------------
-    # Основные методы расчета
-    # -------------------------------------------------
-
-    def _calculate_basic_metrics(
-        self,
-        transcript: Transcript
-    ) -> Tuple[float, float, int]:
-        """Рассчитывает базовые метрики."""
-        segments = transcript.segments
-        if not segments:
-            return 0.0, 0.0, 0
-
-        duration_sec = float(segments[-1].end)
-
-        speaking_time_sec = 0.0
-        for seg in segments:
-            speaking_time_sec += max(0.0, seg.end - seg.start)
-
-        words_total = len(self._split_words(transcript.text))
-
-        return duration_sec, speaking_time_sec, words_total
-
-    @staticmethod
-    def _calculate_wpm(words_total: int, speaking_time_sec: float) -> float:
-        """Рассчитывает слова в минуту."""
-        if speaking_time_sec > 0 and words_total > 0:
-            return words_total / (speaking_time_sec / 60.0)
-        return 0.0
-
-    # -------------------------------------------------
-    # Слова-паразиты
-    # -------------------------------------------------
-=======
             transcript=full_text,
             gigachat_analysis=None,
         )
 
+    def _analyze_with_timings(self, transcript: Transcript) -> TimedAnalysisData:
+        """Анализ с использованием таймингов слов"""
+        if not transcript.word_timings:
+            return TimedAnalysisData()
+
+        return TimedAnalysisData(
+            filler_words_detailed=self._find_fillers_with_exact_timings(
+                transcript),
+            pauses_detailed=self._analyze_pauses_with_word_timings(transcript),
+            speech_rate_windows=self._calculate_speech_windows_by_words(
+                transcript),
+            word_timings_count=len(transcript.word_timings),
+            speaking_activity=self._build_speaking_activity(transcript),
+        )
+
+    def _find_fillers_with_exact_timings(self, transcript: Transcript) -> List[TimedFillerWord]:
+        """Находит слова-паразиты с точными таймингами"""
+        fillers = []
+
+        for word_timing in transcript.word_timings:
+            word_text = word_timing.word.lower().strip(",.!?;:()\"'")
+
+            for filler_name, pattern in COMPILED_FILLERS:
+                if pattern.match(word_text):
+                    fillers.append(TimedFillerWord(
+                        word=filler_name,
+                        timestamp=round(word_timing.start, 2),
+                        exact_word=word_timing.word,
+                        confidence=word_timing.confidence
+                    ))
+                    break
+
+        return fillers
+
+    def _analyze_pauses_with_word_timings(self, transcript: Transcript) -> List[TimedPause]:
+        """Анализирует паузы между словами"""
+        if len(transcript.word_timings) < 2:
+            return []
+
+        pauses = []
+        for i in range(len(transcript.word_timings) - 1):
+            current_word = transcript.word_timings[i]
+            next_word = transcript.word_timings[i + 1]
+
+            pause_duration = next_word.start - current_word.end
+
+            if pause_duration >= MIN_PAUSE_GAP_SEC:
+                pause_type = self._classify_pause(pause_duration)
+
+                pauses.append(TimedPause(
+                    start=round(current_word.end, 2),
+                    end=round(next_word.start, 2),
+                    duration=round(pause_duration, 2),
+                    type=pause_type,
+                    before_word=current_word.word,
+                    after_word=next_word.word
+                ))
+
+        return pauses
+
+    def _calculate_speech_windows_by_words(self, transcript: Transcript) -> List[SpeechRateWindow]:
+        """Рассчитывает темп речи в скользящих окнах на основе таймингов слов"""
+        if not transcript.word_timings:
+            return []
+
+        total_duration = max(wt.end for wt in transcript.word_timings)
+        windows = []
+        current_start = 0.0
+
+        while current_start < total_duration:
+            window_end = min(
+                current_start + SPEECH_RATE_WINDOW_SIZE, total_duration)
+
+            # Считаем слова в окне
+            words_in_window = 0
+            speaking_time = 0.0
+
+            for word_timing in transcript.word_timings:
+                if word_timing.start >= current_start and word_timing.end <= window_end:
+                    words_in_window += 1
+                    speaking_time += (word_timing.end - word_timing.start)
+                elif word_timing.start < window_end and word_timing.end > current_start:
+                    # Частичное пересечение
+                    overlap_start = max(word_timing.start, current_start)
+                    overlap_end = min(word_timing.end, window_end)
+                    if overlap_end > overlap_start:
+                        words_in_window += (overlap_end - overlap_start) / \
+                            (word_timing.end - word_timing.start)
+                        speaking_time += (overlap_end - overlap_start)
+
+            wpm = words_in_window / \
+                (speaking_time / 60.0) if speaking_time > 0 else 0.0
+
+            windows.append(SpeechRateWindow(
+                window_start=round(current_start, 2),
+                window_end=round(window_end, 2),
+                word_count=int(words_in_window),
+                words_per_minute=round(wpm, 1),
+                speaking_time=round(speaking_time, 2)
+            ))
+
+            current_start += SPEECH_RATE_WINDOW_STEP
+
+        return windows
+
+    def _build_speaking_activity(self, transcript: Transcript, resolution: float = 0.5) -> List[Dict[str, float]]:
+        """Создает массив активности говорения для визуализации"""
+        if not transcript.word_timings:
+            return []
+
+        total_duration = max(wt.end for wt in transcript.word_timings)
+        activity = []
+        current_time = 0.0
+
+        while current_time <= total_duration:
+            is_speaking = 0.0
+
+            for word_timing in transcript.word_timings:
+                if word_timing.start <= current_time <= word_timing.end:
+                    is_speaking = 1.0
+                    break
+
+            activity.append({
+                "time": round(current_time, 2),
+                "is_speaking": is_speaking
+            })
+
+            current_time += resolution
+
+        return activity
+
+    @staticmethod
+    def _classify_pause(duration: float) -> str:
+        """Классифицирует паузу по длительности."""
+        if duration < 1.0:
+            return "natural"
+        elif duration < 2.5:
+            return "dramatic"
+        elif duration < 5.0:
+            return "long"
+        else:
+            return "awkward"
+
+    # Остальные методы остаются без изменений (из предыдущей версии)
     def _empty_analysis_result(self, text: str) -> AnalysisResult:
         """Возвращает результат для пустого транскрипта"""
         return AnalysisResult(
@@ -325,7 +439,6 @@ class SpeechAnalyzer:
         if speaking_time_sec <= 0 or words_total <= 0:
             return 0.0
         return words_total / (speaking_time_sec / 60.0)
->>>>>>> feature/gigachat-integration
 
     @staticmethod
     def _split_words(text: str) -> List[str]:
@@ -336,14 +449,10 @@ class SpeechAnalyzer:
 
     @staticmethod
     def _count_fillers(text: str) -> Tuple[int, Dict[str, int]]:
-<<<<<<< HEAD
-        """Подсчитывает слова-паразиты в тексте."""
-=======
         """Считает слова-паразиты"""
         if not text:
             return 0, {}
 
->>>>>>> feature/gigachat-integration
         counts: Dict[str, int] = {}
         total = 0
 
@@ -356,92 +465,16 @@ class SpeechAnalyzer:
 
         return total, counts
 
-    def _build_filler_stats(
-        self,
-        total: int,
-        detail: Dict[str, int],
-        words_total: int
-    ) -> FillerWordsStats:
-        """Формирует статистику по словам-паразитам."""
-        items = [
-            {"word": name, "count": detail.get(name, 0)}
-            for name, _ in COMPILED_FILLERS
-        ]
-
-        per_100_words = round(
-            (total / words_total * 100), 1
-        ) if words_total else 0.0
-
-        return FillerWordsStats(
-            total=total,
-            per_100_words=per_100_words,
-            items=items
-        )
-
-    def _find_fillers_with_timings(self, transcript: Transcript) -> List[TimedFillerWord]:
-        """Находит слова-паразиты с точными таймингами."""
-        results = []
-
-        if not transcript.word_timings:
-            return results
-
-        for word_timing in transcript.word_timings:
-            word_text = word_timing.word.lower().strip(",.!?;:()\"'")
-
-            for filler_name, pattern in COMPILED_FILLERS:
-                if pattern.match(word_text):
-                    context = self._get_word_context(transcript, word_timing)
-                    segment_start, segment_end = self._find_word_segment(
-                        transcript, word_timing)
-
-                    results.append(TimedFillerWord(
-                        word=filler_name,
-                        timestamp=round(word_timing.start, 2),
-                        text_context=context,
-                        segment_start=round(segment_start, 2),
-                        segment_end=round(segment_end, 2)
-                    ))
-                    break
-
-        return results
-
-    # -------------------------------------------------
-    # Паузы
-    # -------------------------------------------------
-
-    def _extract_raw_pauses(
-        self,
-        segments: List[TranscriptSegment]
-    ) -> List[Dict[str, float]]:
-        """Извлекает паузы между сегментами."""
-        pauses = []
-        for i in range(len(segments) - 1):
-            gap = segments[i + 1].start - segments[i].end
-            if gap >= MIN_PAUSE_GAP_SEC:
-                pauses.append({
-                    "start": segments[i].end,
-                    "end": segments[i + 1].start,
-                    "duration": gap
-                })
-        return pauses
-
     @staticmethod
     def _filter_noisy_pauses(
         audio_path: Path,
         pauses: List[Dict[str, float]],
         segments: List[TranscriptSegment],
     ) -> List[Dict[str, float]]:
-<<<<<<< HEAD
-        """Фильтрует шумные паузы по уровню громкости."""
-        try:
-            with wave.open(str(audio_path), "rb") as wf:
-                n_channels, sampwidth, framerate, n_frames = wf.getparams()[:4]
-=======
         """Фильтрует шумные паузы"""
         try:
             with wave.open(str(audio_path), "rb") as wf:
                 n_channels, sampwidth, framerate, n_frames, *_ = wf.getparams()
->>>>>>> feature/gigachat-integration
 
                 if n_channels != 1 or sampwidth != 2:
                     return pauses
@@ -461,21 +494,11 @@ class SpeechAnalyzer:
             count = end_idx - start_idx
             if count <= 0:
                 return 0.0
-<<<<<<< HEAD
-=======
 
->>>>>>> feature/gigachat-integration
             sum_sq = sum(samples[i] * samples[i]
                          for i in range(start_idx, end_idx))
             return math.sqrt(sum_sq / count)
 
-<<<<<<< HEAD
-        # Громкость речи
-        speech_rms_values: List[float] = []
-        for seg in segments:
-            start_idx = max(0, int(seg.start * framerate))
-            end_idx = min(num_samples, int(seg.end * framerate))
-=======
         # RMS речевых сегментов
         speech_rms_values = []
         for seg in segments:
@@ -484,7 +507,6 @@ class SpeechAnalyzer:
             start_idx = max(0, int(start_s * framerate))
             end_idx = min(num_samples, int(end_s * framerate))
 
->>>>>>> feature/gigachat-integration
             if end_idx - start_idx < int(0.2 * framerate):
                 continue
 
@@ -502,11 +524,6 @@ class SpeechAnalyzer:
 
         # Фильтрация пауз
         filtered = []
-<<<<<<< HEAD
-        for p in pauses:
-            start_idx = max(0, int(p["start"] * framerate))
-            end_idx = min(num_samples, int(p["end"] * framerate))
-=======
         for pause in pauses:
             start_s = pause["start"]
             end_s = pause["end"]
@@ -517,29 +534,19 @@ class SpeechAnalyzer:
             start_idx = max(0, int(start_s * framerate))
             end_idx = min(num_samples, int(end_s * framerate))
 
->>>>>>> feature/gigachat-integration
             if end_idx <= start_idx:
                 continue
 
             r = segment_rms(start_idx, end_idx)
-<<<<<<< HEAD
-            if r < silence_threshold:
-                filtered.append(p)
-=======
 
             if r < silence_threshold:
                 filtered.append(pause)
->>>>>>> feature/gigachat-integration
 
         return filtered
 
     @staticmethod
     def _summarize_pauses(pauses: List[Dict[str, float]]) -> PausesStats:
-<<<<<<< HEAD
-        """Суммирует статистику по паузам."""
-=======
         """Суммирует статистику пауз"""
->>>>>>> feature/gigachat-integration
         if not pauses:
             return PausesStats(
                 count=0,
@@ -562,11 +569,8 @@ class SpeechAnalyzer:
             for p in pauses
             if p["duration"] >= LONG_PAUSE_SEC
         ]
-<<<<<<< HEAD
-=======
 
         # Топ-3 самых длинных
->>>>>>> feature/gigachat-integration
         long_pauses = sorted(
             long_pauses, key=lambda p: p["duration"], reverse=True)[:3]
 
@@ -577,76 +581,16 @@ class SpeechAnalyzer:
             long_pauses=long_pauses,
         )
 
-    def _analyze_pauses_with_context(
-        self,
-        pauses: List[Dict[str, float]],
-        segments: List[TranscriptSegment]
-    ) -> List[TimedPause]:
-        """Анализирует паузы с контекстом."""
-        pauses_detailed = []
-
-        for pause in pauses:
-            segment_before = None
-            segment_after = None
-
-            for seg in segments:
-                if abs(seg.end - pause["start"]) < 0.1:
-                    segment_before = seg
-                if abs(seg.start - pause["end"]) < 0.1:
-                    segment_after = seg
-
-            pause_type = self._classify_pause(pause["duration"])
-            context_before = segment_before.text[-50:] if segment_before else ""
-            context_after = segment_after.text[:50] if segment_after else ""
-
-            pauses_detailed.append(TimedPause(
-                start=round(pause["start"], 2),
-                end=round(pause["end"], 2),
-                duration=round(pause["duration"], 2),
-                type=pause_type,
-                context_before=context_before,
-                context_after=context_after,
-                speech_before_end=round(pause["start"], 2),
-                speech_after_start=round(pause["end"], 2)
-            ))
-
-        return pauses_detailed
-
-    @staticmethod
-    def _classify_pause(duration: float) -> str:
-        """Классифицирует паузу по длительности."""
-        if duration < 1.0:
-            return "natural"
-        elif duration < 2.5:
-            return "dramatic"
-        elif duration < 5.0:
-            return "long"
-        else:
-            return "awkward"
-
-    # -------------------------------------------------
-    # Фразы
-    # -------------------------------------------------
-
     def _build_phrase_stats(
         self,
         segments: List[TranscriptSegment],
         pauses: List[Dict[str, float]],
     ) -> PhraseStats:
-<<<<<<< HEAD
-        """Анализирует структуру фраз."""
-=======
         """Строит статистику фраз"""
->>>>>>> feature/gigachat-integration
         if not segments:
             return self._empty_phrase_stats()
 
         # Определяем границы фраз
-<<<<<<< HEAD
-        boundary_after_idx = set()
-        for p in pauses:
-            pause_start = p["start"]
-=======
         boundary_after_idx = self._find_phrase_boundaries(segments, pauses)
 
         # Собираем фразы
@@ -668,7 +612,6 @@ class SpeechAnalyzer:
 
         for pause in pauses:
             pause_start = pause["start"]
->>>>>>> feature/gigachat-integration
             best_idx = None
             best_diff = float("inf")
 
@@ -681,9 +624,6 @@ class SpeechAnalyzer:
             if best_idx is not None and best_diff <= PAUSE_SEGMENT_TIME_TOLERANCE:
                 boundary_after_idx.add(best_idx)
 
-<<<<<<< HEAD
-        # Разделяем на фразы
-=======
         return boundary_after_idx
 
     def _collect_phrases(
@@ -692,7 +632,6 @@ class SpeechAnalyzer:
         boundary_after_idx: set
     ) -> Tuple[List[float], List[int]]:
         """Собирает фразы из сегментов"""
->>>>>>> feature/gigachat-integration
         phrases_durations: List[float] = []
         phrases_words: List[int] = []
         phrase_start_idx = 0
@@ -704,10 +643,7 @@ class SpeechAnalyzer:
             if is_boundary or is_last_seg:
                 phrase_end_idx = idx
                 segs = segments[phrase_start_idx: phrase_end_idx + 1]
-<<<<<<< HEAD
-=======
 
->>>>>>> feature/gigachat-integration
                 if segs:
                     dur, wcount = self._phrase_metrics(segs)
                     if wcount > 0 and dur > 0:
@@ -716,31 +652,6 @@ class SpeechAnalyzer:
 
                 phrase_start_idx = idx + 1
 
-<<<<<<< HEAD
-            if is_last_seg and phrase_start_idx <= idx:
-                # закрываем последнюю фразу (если не закрыли выше)
-                segs = segments[phrase_start_idx: idx + 1]
-                if segs:
-                    dur, wcount = self._phrase_metrics(segs)
-                    if wcount > 0 and dur > 0:
-                        phrases_durations.append(dur)
-                        phrases_words.append(wcount)
-
-        if not phrases_words:
-            return PhraseStats(
-                count=0,
-                avg_words=0.0,
-                avg_duration_sec=0.0,
-                min_words=0,
-                max_words=0,
-                min_duration_sec=0.0,
-                max_duration_sec=0.0,
-                length_classification="insufficient_data",
-                rhythm_variation="insufficient_data",
-            )
-
-        # Статистика по фразам
-=======
         return phrases_durations, phrases_words
 
     def _calculate_phrase_stats(
@@ -749,16 +660,11 @@ class SpeechAnalyzer:
         phrases_words: List[int]
     ) -> PhraseStats:
         """Рассчитывает статистику фраз"""
->>>>>>> feature/gigachat-integration
         count = len(phrases_words)
         avg_words = sum(phrases_words) / count
         avg_dur = sum(phrases_durations) / count
 
-<<<<<<< HEAD
-        # Классификация
-=======
         # Классификация по длине фраз
->>>>>>> feature/gigachat-integration
         if avg_words < 8:
             length_class = "short_phrases"
         elif avg_words <= 25:
@@ -767,24 +673,8 @@ class SpeechAnalyzer:
             length_class = "long_phrases"
 
         # Вариативность ритма
-<<<<<<< HEAD
-        if count < 2 or avg_dur <= 0:
-            rhythm_var = "insufficient_data"
-        else:
-            mean_dur = avg_dur
-            var = sum((d - mean_dur) ** 2 for d in phrases_durations) / count
-            std = math.sqrt(var)
-            cv = std / mean_dur
-            if cv < 0.25:
-                rhythm_var = "uniform"
-            elif cv < 0.6:
-                rhythm_var = "moderately_variable"
-            else:
-                rhythm_var = "highly_variable"
-=======
         rhythm_var = self._calculate_rhythm_variation(
             phrases_durations, avg_dur, count)
->>>>>>> feature/gigachat-integration
 
         return PhraseStats(
             count=count,
@@ -798,23 +688,6 @@ class SpeechAnalyzer:
             rhythm_variation=rhythm_var,
         )
 
-<<<<<<< HEAD
-    def _process_phrase(
-        self,
-        segments: List[TranscriptSegment],
-        start_idx: int,
-        end_idx: int,
-        durations: List[float],
-        word_counts: List[int],
-    ) -> None:
-        """Обрабатывает одну фразу и добавляет ее метрики."""
-        segs = segments[start_idx:end_idx + 1]
-        if segs:
-            dur, wcount = self._phrase_metrics(segs)
-            if wcount > 0 and dur > 0:
-                durations.append(dur)
-                word_counts.append(wcount)
-=======
     @staticmethod
     def _calculate_rhythm_variation(
         durations: List[float],
@@ -850,18 +723,11 @@ class SpeechAnalyzer:
             length_classification="insufficient_data",
             rhythm_variation="insufficient_data",
         )
->>>>>>> feature/gigachat-integration
 
     def _phrase_metrics(
         self,
         segs: List[TranscriptSegment],
     ) -> Tuple[float, int]:
-<<<<<<< HEAD
-        """Возвращает длительность и количество слов во фразе."""
-        if not segs:
-            return 0.0, 0
-        duration = segs[-1].end - segs[0].start
-=======
         """Возвращает длительность и количество слов во фразе"""
         if not segs:
             return 0.0, 0
@@ -870,7 +736,6 @@ class SpeechAnalyzer:
         end = float(segs[-1].end)
         duration = max(0.0, end - start)
 
->>>>>>> feature/gigachat-integration
         text = " ".join(s.text for s in segs)
         words = self._split_words(text)
 
@@ -888,294 +753,17 @@ class SpeechAnalyzer:
         pauses_stats: PausesStats,
         phrase_stats: PhraseStats,
     ) -> List[AdviceItem]:
-<<<<<<< HEAD
-        """Генерирует советы по улучшению речи."""
-        advice = []
-
-        # 1. Темп речи
-        if words_total == 0 or words_per_minute == 0:
-            speech_obs = "Автоматический анализ темпа речи затруднён."
-            speech_rec = "Запишите более продолжительный фрагмент с отчётливой речью."
-            speech_sev = "info"
-        elif words_per_minute < MIN_COMFORT_WPM:
-            speech_obs = f"Темп речи примерно {words_per_minute:.1f} слов в минуту, ниже типичного диапазона ({
-                MIN_COMFORT_WPM:.0f}–{MAX_COMFORT_WPM:.0f})."
-            speech_rec = "Ускорьте речь, сократив избыточные паузы."
-            speech_sev = "suggestion"
-        elif words_per_minute > MAX_COMFORT_WPM:
-            speech_obs = f"Темп речи примерно {words_per_minute:.1f} слов в минуту, выше типичного диапазона ({
-                MIN_COMFORT_WPM:.0f}–{MAX_COMFORT_WPM:.0f})."
-            speech_rec = "Замедлите подачу, делая более заметные паузы."
-            speech_sev = "suggestion"
-        else:
-            speech_observation = (
-                "Оценённый темп речи составляет примерно {wpm:.1f} слов в минуту, "
-                "что находится в пределах типичного диапазона публичных выступлений."
-            ).format(wpm=words_per_minute)
-            speech_recommendation = (
-                "Сохраняйте выбранный темп и при необходимости варьируйте его для "
-                "подчёркивания ключевых смысловых блоков."
-            )
-            speech_severity = "info"
-=======
         """Генерирует рекомендации"""
         advice = []
 
         # 1. Темп речи
         advice.append(SpeechAnalyzer._generate_speech_rate_advice(
             words_per_minute, words_total))
->>>>>>> feature/gigachat-integration
 
         # 2. Слова-паразиты
         advice.append(SpeechAnalyzer._generate_filler_advice(
             filler_total, words_total))
 
-<<<<<<< HEAD
-        # --- 2. Слова-паразиты ---
-        fillers_per_100 = (filler_total / words_total *
-                           100) if words_total else 0.0
-
-        if filler_total == 0:
-            filler_obs = "Не обнаружено слов-паразитов."
-            filler_rec = "Отличный контроль речи!"
-            filler_sev = "info"
-        elif fillers_per_100 <= 3:
-            filler_obs = f"Слова-паразиты присутствуют, но их доля невелика ({
-                fillers_per_100:.1f} на 100 слов)."
-            filler_rec = "Можно дополнительно снизить их количество."
-            filler_sev = "info"
-        elif fillers_per_100 <= 8:
-            filler_obs = f"Доля слов-паразитов {
-                fillers_per_100:.1f} на 100 слов."
-            filler_rec = "Обратите внимание на часто повторяющиеся конструкции."
-            filler_sev = "suggestion"
-        else:
-            filler_obs = f"Высокая доля слов-паразитов ({
-                fillers_per_100:.1f} на 100 слов)."
-            filler_rec = "Тренируйтесь делать сознательные паузы вместо слов-паразитов."
-            filler_sev = "warning"
-
-        advice.append(AdviceItem(
-            category="filler_words",
-            severity=filler_sev,
-            title="Слова-паразиты",
-            observation=filler_obs,
-            recommendation=filler_rec,
-        ))
-
-        # 3. Паузы
-        if pauses_stats.count == 0:
-            pauses_obs = "Практически отсутствуют выделенные паузы."
-            pauses_rec = "Используйте короткие паузы для выделения ключевых мыслей."
-            pauses_sev = "info"
-        else:
-            long_count = len(pauses_stats.long_pauses)
-            long_fraction = long_count / pauses_stats.count if pauses_stats.count > 0 else 0.0
-
-            if long_count > 0 and long_fraction > 0.3:
-                pauses_obs = f"Обнаружены длинные паузы (до {
-                    pauses_stats.max_sec:.1f} секунд)."
-                pauses_rec = "Заполняйте длинные паузы чёткими вводными фразами."
-                pauses_sev = "suggestion"
-            else:
-                pauses_obs = f"Паузы присутствуют (средняя длительность {
-                    pauses_stats.avg_sec:.1f} секунд)."
-                pauses_rec = "Баланс пауз выглядит естественным."
-                pauses_sev = "info"
-
-        advice.append(AdviceItem(
-            category="pauses",
-            severity=pauses_sev,
-            title="Паузы в речи",
-            observation=pauses_obs,
-            recommendation=pauses_rec,
-        ))
-
-        # 4. Структура фраз
-        if phrase_stats.count <= 1:
-            phr_obs = "Анализ структуры фраз затруднён."
-            phr_rec = "Используйте паузы между смысловыми блоками."
-            phr_sev = "info"
-        else:
-            phr_obs = f"Средняя длина фразы: {
-                phrase_stats.avg_words:.1f} слов."
-
-            if phrase_stats.length_classification == "short_phrases":
-                phr_obs += " Фразы в основном короткие."
-                phr_rec = "Объединяйте близкие по смыслу предложения."
-                phr_sev = "suggestion"
-            elif phrase_stats.length_classification == "long_phrases":
-                phr_obs += " Фразы достаточно длинные."
-                phr_rec = "Разбивайте длинные фразы на смысловые единицы."
-                phr_sev = "suggestion"
-            else:
-                phr_obs += " Длина фраз сбалансирована."
-                phr_rec = "Сохраняйте текущую структуру."
-                phr_sev = "info"
-
-        advice.append(AdviceItem(
-            category="phrasing",
-            severity=phr_sev,
-            title="Структура фраз",
-            observation=phr_obs,
-            recommendation=phr_rec,
-        ))
-
-        return advice
-
-    # -------------------------------------------------
-    # Дополнительные метрики с таймингами
-    # -------------------------------------------------
-
-    def _calculate_speech_windows(
-        self,
-        transcript: Transcript,
-        window_size: float = 30.0,
-        step: float = 15.0
-    ) -> List[SpeechRateWindow]:
-        """Рассчитывает темп речи в скользящих окнах."""
-        windows = []
-
-        if not transcript.segments:
-            return windows
-
-        total_duration = transcript.segments[-1].end
-        current_start = 0.0
-
-        while current_start < total_duration:
-            window_end = min(current_start + window_size, total_duration)
-
-            words_in_window = 0
-            speaking_time = 0.0
-
-            for segment in transcript.segments:
-                seg_start = max(segment.start, current_start)
-                seg_end = min(segment.end, window_end)
-
-                if seg_end > seg_start:
-                    overlap = seg_end - seg_start
-                    speaking_time += overlap
-
-                    total_seg = segment.end - segment.start
-                    if total_seg > 0:
-                        ratio = overlap / total_seg
-                        seg_words = len(self._split_words(segment.text))
-                        words_in_window += int(seg_words * ratio)
-
-            wpm = words_in_window / \
-                (speaking_time / 60.0) if speaking_time > 0 else 0.0
-
-            windows.append(SpeechRateWindow(
-                window_start=round(current_start, 2),
-                window_end=round(window_end, 2),
-                word_count=words_in_window,
-                words_per_minute=round(wpm, 1),
-                speaking_time=round(speaking_time, 2)
-            ))
-
-            current_start += step
-
-        return windows
-
-    def _build_speaking_activity(
-        self,
-        transcript: Transcript,
-        resolution: float = 1.0  # Оптимизировано: точка каждую секунду
-    ) -> List[Dict[str, float]]:
-        """Создает массив активности говорения."""
-        activity = []
-
-        if not transcript.segments:
-            return activity
-
-        total_duration = transcript.segments[-1].end
-        current_time = 0.0
-
-        while current_time <= total_duration:
-            is_speaking = 0.0
-
-            for segment in transcript.segments:
-                if segment.start <= current_time <= segment.end:
-                    is_speaking = 1.0
-                    break
-
-            activity.append({
-                "time": round(current_time, 2),
-                "is_speaking": is_speaking
-            })
-
-            current_time += resolution
-
-        return activity
-
-    @staticmethod
-    def _extract_phrase_boundaries(segments: List[TranscriptSegment]) -> List[float]:
-        """Извлекает границы фраз."""
-        return [round(seg.start, 2) for seg in segments]
-
-    @staticmethod
-    def _convert_segments_to_dict(segments: List[TranscriptSegment]) -> List[Dict[str, Any]]:
-        """Конвертирует сегменты в словари для JSON."""
-        return [
-            {
-                "start": s.start,
-                "end": s.end,
-                "text": s.text,
-                "words": [{"word": w.word, "start": w.start, "end": w.end} for w in s.words]
-            }
-            for s in segments
-        ]
-
-    # -------------------------------------------------
-    # Вспомогательные методы
-    # -------------------------------------------------
-
-    def _get_word_context(
-        self,
-        transcript: Transcript,
-        word_timing: WordTiming,
-        words_before: int = 2,
-        words_after: int = 2
-    ) -> str:
-        """Возвращает контекст слова."""
-        for segment in transcript.segments:
-            if segment.start <= word_timing.start <= segment.end:
-                all_words = segment.text.split()
-
-                word_index = -1
-                for i, word in enumerate(all_words):
-                    if word_timing.word.lower() in word.lower():
-                        word_index = i
-                        break
-
-                if word_index >= 0:
-                    start_idx = max(0, word_index - words_before)
-                    end_idx = min(len(all_words), word_index + words_after + 1)
-                    context_words = all_words[start_idx:end_idx]
-
-                    marked_words = []
-                    for i, w in enumerate(context_words):
-                        if start_idx + i == word_index:
-                            marked_words.append(f"[{w}]")
-                        else:
-                            marked_words.append(w)
-
-                    return " ".join(marked_words)
-
-        return f"[{word_timing.word}]"
-
-    def _find_word_segment(
-        self,
-        transcript: Transcript,
-        word_timing: WordTiming
-    ) -> tuple[float, float]:
-        """Находит сегмент, содержащий слово."""
-        for segment in transcript.segments:
-            if segment.start <= word_timing.start <= segment.end:
-                return segment.start, segment.end
-
-        return word_timing.start, word_timing.end
-=======
         # 3. Паузы
         advice.append(SpeechAnalyzer._generate_pauses_advice(pauses_stats))
 
@@ -1334,4 +922,3 @@ class SpeechAnalyzer:
             observation=observation,
             recommendation=recommendation
         )
->>>>>>> feature/gigachat-integration
