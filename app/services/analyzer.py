@@ -177,11 +177,12 @@ class SpeechAnalyzer:
             words_per_minute, filler_total, words_total, pauses_stats, phrase_stats)
 
         # Статистика слов-паразитов
+        # Вычисляем слова-паразиты на 100 слов ТОЧНО из полного текста
         filler_stats = FillerWordsStats(
             total=filler_total,
             per_100_words=round(
-                (filler_total / words_total * 100), 1
-            ) if words_total else 0.0,
+                (filler_total / words_total * 100), 2
+            ) if words_total > 0 else 0.0,
             items=[
                 {"word": name, "count": filler_detail.get(name, 0)}
                 for name, _ in COMPILED_FILLERS
@@ -228,7 +229,8 @@ class SpeechAnalyzer:
             word_text = word_timing.word.lower().strip(",.!?;:()\"'")
 
             for filler_name, pattern in COMPILED_FILLERS:
-                if pattern.match(word_text):
+                # Используем search вместо match, так как match проверяет начало строки
+                if pattern.search(word_text):
                     fillers.append(TimedFillerWord(
                         word=filler_name,
                         timestamp=round(word_timing.start, 2),
@@ -456,12 +458,18 @@ class SpeechAnalyzer:
         counts: Dict[str, int] = {}
         total = 0
 
+        # Используем finditer вместо findall чтобы правильно считать совпадения
+        found_positions = set()
+
         for name, pattern in COMPILED_FILLERS:
-            matches = pattern.findall(text)
-            if matches:
-                count = len(matches)
-                counts[name] = count
-                total += count
+            for match in pattern.finditer(text):
+                start, end = match.span()
+                # Проверяем, не пересекается ли это совпадение с другими
+                if not any(start < pos <= end or pos >= start and pos < end 
+                          for pos in found_positions):
+                    found_positions.add(start)
+                    counts[name] = counts.get(name, 0) + 1
+                    total += 1
 
         return total, counts
 

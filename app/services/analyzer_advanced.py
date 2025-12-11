@@ -121,7 +121,7 @@ class AdvancedSpeechAnalyzer:
             # Статистика
             filler_words={
                 "total": len(fillers),
-                "per_100_words": len(fillers) / len(advanced_words) * 100 if advanced_words else 0,
+                "per_100_words": round(len(fillers) / len(advanced_words) * 100, 2) if advanced_words else 0.0,
                 "items": self._group_fillers_by_type(fillers),
                 "distribution": self._analyze_filler_distribution(fillers, total_duration)
             },
@@ -176,9 +176,10 @@ class AdvancedSpeechAnalyzer:
                 transcript.word_timings, i, -2, 0)
             context_after = self._get_context(transcript.word_timings, i, 0, 2)
 
-            # Проверка на слово-паразит
+            # Проверка на слово-паразит - используем search вместо match
+            word_text = word.word.lower().strip(",.!?;:()\"'")
             is_filler = any(
-                pattern.match(word.word.lower().strip(",.!?;:()\"'"))
+                pattern.search(word_text)
                 for _, pattern in self.filler_patterns
             )
 
@@ -564,13 +565,14 @@ class AdvancedSpeechAnalyzer:
         word_lower = word.lower().strip(",.!?;:()\"'")
 
         for filler_name, pattern in self.filler_patterns:
-            if pattern.match(word_lower):
+            # Используем search вместо match для лучшего совпадения
+            if pattern.search(word_lower):
                 return filler_name
 
         # Дополнительные проверки
-        if re.match(r'э+', word_lower):
+        if re.search(r'э+', word_lower):
             return "э-э"
-        elif re.match(r'а+', word_lower):
+        elif re.search(r'а+', word_lower):
             return "а-а"
         elif word_lower in ["ну", "вот"]:
             return word_lower
@@ -1015,7 +1017,7 @@ class AdvancedSpeechAnalyzer:
             {
                 "word": word,
                 "count": count,
-                "percentage": count / len(fillers) * 100 if fillers else 0
+                "percentage": round(count / len(fillers) * 100, 2) if fillers else 0.0
             }
             for word, count in counter.most_common()
         ]
