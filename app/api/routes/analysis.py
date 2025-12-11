@@ -107,7 +107,7 @@ async def analyze_video_detailed(
 
     Идеально для создания интерактивных временных шкал и подробных отчетов.
     """
-        logger.info(f"Получен запрос на детализированный анализ файла: {file.filename}")
+    logger.info(f"Получен запрос на детализированный анализ файла: {file.filename}")
 
     try:
         result = await pipeline.analyze_with_timings(file)
