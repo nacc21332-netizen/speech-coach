@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import logging
 import uuid
 import time
@@ -443,13 +444,17 @@ class GigaChatClient:
                         processing_time:.1f} seconds")
 
             try:
-                parsed_content = json.loads(content)
+                # Попробуем более терпимый парсинг: сначала очистить текст,
+                # затем попытаться распарсить JSON. Это позволит обработать
+                # ситуации с лишними запятыми, поясняющими фразами вокруг JSON и т.п.
+                cleaned = self._clean_json_response(content)
+                parsed_content = json.loads(cleaned)
                 parsed_content["processing_time_sec"] = processing_time
                 return parsed_content
 
             except (json.JSONDecodeError, ValidationError) as e:
-                logger.warning(
-                    f"Failed to parse GigaChat response as JSON: {e}")
+                logger.warning(f"Failed to parse GigaChat response as JSON: {e}")
+                logger.debug(f"Raw content (first 2000 chars): {content[:2000]}")
                 processing_time = time.time() - start_time
                 return self._create_error_response(f"JSON parse error", processing_time)
 
@@ -538,6 +543,43 @@ class GigaChatClient:
 3. Привязывай все советы к конкретным моментам времени
 """
         return prompt
+
+    def _clean_json_response(self, content: str) -> str:
+        """Попытка аккуратно извлечь/очистить JSON из произвольного текста.
+
+        Стратегия:
+        - Найти первую '{' и последнюю '}' и взять подстроку
+        - Заменить «умные» кавычки на обычные
+        - Удалить хвостовые запятые перед '}' и ']' с помощью regex
+        - Убрать управляющие символы
+        Если ничего не найдено — вернуть исходную строку.
+        """
+        try:
+            if not content or not isinstance(content, str):
+                return content
+
+            # Нормализация кавычек
+            s = content.replace('“', '"').replace('”', '"').replace("\u2018", "'").replace("\u2019", "'")
+
+            # Найдём самую левую фигурную скобку и самую правую
+            first = s.find('{')
+            last = s.rfind('}')
+            if first != -1 and last != -1 and last > first:
+                s = s[first:last+1]
+
+            # Уберём возможные односторонние комменты и управляющие символы
+            s = re.sub(r'\s+//.*', '', s)
+            s = re.sub(r'\s+\\n', ' ', s)
+
+            # Удаляем хвостовые запятые перед закрывающими скобками
+            s = re.sub(r',\s*(?=[}\]])', '', s)
+
+            # Trim
+            s = s.strip()
+
+            return s
+        except Exception:
+            return content
 
     def _create_error_response(self, error_message: str, processing_time: float) -> Dict[str, Any]:
         """Создает ответ об ошибке"""
