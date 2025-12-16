@@ -75,7 +75,11 @@ async def chat_with_gigachat(
             })
         
         # Убедимся, что токен аутентификации действителен
-        await gigachat_client.authenticate()
+        try:
+            await gigachat_client.authenticate()
+        except GigaChatError as e:
+            logger.error(f"Failed to authenticate with GigaChat API: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to authenticate with GigaChat API: {str(e)}")
         
         # Проверяем, что токен действительно установлен после аутентификации
         if not gigachat_client._access_token:
@@ -100,7 +104,11 @@ async def chat_with_gigachat(
 
         logger.info(f"Sending chat request to GigaChat with {len(formatted_messages)} messages...")
         
-        response = await gigachat_client.client.post(chat_url, json=request_data, headers=headers)
+        try:
+            response = await gigachat_client.client.post(chat_url, json=request_data, headers=headers)
+        except httpx.ConnectError as e:
+            logger.error(f"Connection error when sending chat request to GigaChat: {e}")
+            raise HTTPException(status_code=500, detail=f"Connection error when connecting to GigaChat API: {str(e)}")
 
         if response.status_code != 200:
             logger.error(f"GigaChat API error {response.status_code}: {response.text}")
@@ -174,7 +182,11 @@ async def analyze_followup_chat(
             })
         
         # Убедимся, что токен аутентификации действителен
-        await gigachat_client.authenticate()
+        try:
+            await gigachat_client.authenticate()
+        except GigaChatError as e:
+            logger.error(f"Failed to authenticate with GigaChat API: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to authenticate with GigaChat API: {str(e)}")
         
         # Проверяем, что токен действительно установлен после аутентификации
         if not gigachat_client._access_token:
@@ -199,7 +211,11 @@ async def analyze_followup_chat(
 
         logger.info(f"Sending analysis follow-up request to GigaChat...")
         
-        response = await gigachat_client.client.post(chat_url, json=request_data, headers=headers)
+        try:
+            response = await gigachat_client.client.post(chat_url, json=request_data, headers=headers)
+        except httpx.ConnectError as e:
+            logger.error(f"Connection error when sending analysis follow-up request to GigaChat: {e}")
+            raise HTTPException(status_code=500, detail=f"Connection error when connecting to GigaChat API: {str(e)}")
 
         if response.status_code != 200:
             logger.error(f"GigaChat API error {response.status_code}: {response.text}")

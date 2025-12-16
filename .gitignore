@@ -5,8 +5,12 @@ __pycache__/
 *.pyo
 *.pyd
 
+# Dependencies
+.venv/
+venv/
+env/
+
 # Logs
-logs/
 *.log
 
 # Environment
@@ -14,30 +18,24 @@ logs/
 .env.local
 *.env.*
 
-# Dependencies
-.venv/
-venv/
-.env/
-
-# Tests
-.pytest_cache/
+# Coverage
 .coverage
 coverage/
+htmlcov/
 
-# Build artifacts
-dist/
-build/
-target/
-*.egg-info/
+# MyPy
+.mypy_cache/
 
-# Editors
+# Pytest
+.pytest_cache/
+
+# VSCode
 .vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
 
-# OS
+# IntelliJ
+.idea/
+
+# OS generated
 .DS_Store
 Thumbs.db
 ```

@@ -160,6 +160,12 @@ class GigaChatClient:
 
             logger.info("GigaChat authentication successful")
 
+        except httpx.ConnectError as e:
+            logger.error(f"GigaChat connection error: {e}")
+            logger.error(f"Could not connect to GigaChat API at {self.auth_url}")
+            logger.error("Please check your network connection and API endpoint configuration")
+            raise GigaChatError(f"Connection failed to GigaChat API: {e}")
+        
         except httpx.RequestError as e:
             logger.error(f"GigaChat authentication request failed: {e}")
 
@@ -534,6 +540,12 @@ class GigaChatClient:
                 else:
                     logger.error(f"GigaChat classify API error {response.status_code}: {response.text}")
                     return [dict(**c, is_filler_context=False, score=0.0) for c in contexts]
+            except httpx.ConnectError as e:
+                logger.warning(f"GigaChat classify connection error (attempt {attempt+1}): {e}")
+                logger.warning(f"Could not connect to GigaChat API at {chat_url}")
+                await _asyncio.sleep(backoff)
+                backoff *= 2
+                continue
             except Exception as e:
                 logger.warning(f"GigaChat classify request failed (attempt {attempt+1}): {e}")
                 await _asyncio.sleep(backoff)
@@ -607,7 +619,12 @@ class GigaChatClient:
             prompt = self._create_detailed_analysis_prompt(timed_result_dict)
 
             # Убедимся, что токен аутентификации действителен
-            await self.authenticate()
+            try:
+                await self.authenticate()
+            except GigaChatError as e:
+                logger.warning(f"Failed to authenticate with GigaChat: {e}")
+                processing_time = time.time() - start_time
+                return self._create_error_response(f"Failed to authenticate: {str(e)}", processing_time)
             
             # Проверяем, что токен действительно установлен после аутентификации
             if not self._access_token:
@@ -709,7 +726,13 @@ class GigaChatClient:
 
             logger.info("Sending detailed analysis request to GigaChat...")
 
-            response = await self.client.post(chat_url, json=request_data, headers=headers)
+            try:
+                response = await self.client.post(chat_url, json=request_data, headers=headers)
+            except httpx.ConnectError as e:
+                logger.error(f"GigaChat API connection error: {e}")
+                logger.error(f"Could not connect to GigaChat API at {chat_url}")
+                processing_time = time.time() - start_time
+                return self._create_error_response(f"Connection error: {str(e)}", processing_time)
 
             if response.status_code != 200:
                 logger.error(f"GigaChat API error {response.status_code}: {response.text}")
@@ -740,10 +763,10 @@ class GigaChatClient:
                 processing_time = time.time() - start_time
                 return self._create_error_response("JSON parse error after retries", processing_time)
 
-        except httpx.RequestError as e:
-            logger.error(f"GigaChat API request failed: {e}")
+        except httpx.ConnectError as e:
+            logger.error(f"GigaChat API connection failed: {e}")
             processing_time = time.time() - start_time
-            return self._create_error_response(f"Request error: {str(e)}", processing_time)
+            return self._create_error_response(f"Connection error: {str(e)}", processing_time)
         except Exception as e:
             logger.error(f"Error processing GigaChat response: {e}")
             processing_time = time.time() - start_time
