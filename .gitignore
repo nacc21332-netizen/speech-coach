@@ -1,20 +1,33 @@
-```gitignore
+```
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Dependencies
-.venv/
-venv/
-env/
+# Environment
 .env
 .env.local
 .env.*
-
-# Logs
-*.log
+.venv/
+venv/
+ENV/
 
 # IDE
 .vscode/
@@ -23,13 +36,11 @@ env/
 *.swo
 *.tmp
 
+# Logs
+*.log
+
 # Coverage
 .coverage
 coverage/
 htmlcov/
-
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
 ```
