@@ -133,7 +133,26 @@ class GigaChatClient:
 
             auth_result = auth_response.json()
             self._access_token = auth_result.get("access_token")
-            self._token_expires_at = auth_result.get("expires_at")
+            
+            # Получаем время жизни токена из ответа
+            expires_in = auth_result.get("expires_in")  # обычно в секундах
+            if expires_in:
+                # Преобразуем в абсолютное время
+                self._token_expires_at = time.time() + expires_in
+            else:
+                # Если нет expires_in, используем expires_at (если это абсолютное время)
+                expires_at = auth_result.get("expires_at")
+                if isinstance(expires_at, (int, float)):
+                    # Проверяем, является ли это timestamp (большое число) или временем жизни (меньше 1 дня)
+                    if expires_at > time.time() + 86400:  # больше чем через день
+                        # Это абсолютное время
+                        self._token_expires_at = expires_at
+                    else:
+                        # Это время жизни, преобразуем в абсолютное
+                        self._token_expires_at = time.time() + expires_at
+                else:
+                    # По умолчанию устанавливаем время истечения через 9 минут (540 секунд)
+                    self._token_expires_at = time.time() + 540
 
             if not self._access_token:
                 logger.error(f"No access_token in response: {auth_result}")
@@ -175,6 +194,26 @@ class GigaChatClient:
 
         auth_result = auth_response.json()
         self._access_token = auth_result.get("access_token")
+        
+        # Устанавливаем время истечения токена также и в этом случае
+        expires_in = auth_result.get("expires_in")  # обычно в секундах
+        if expires_in:
+            # Преобразуем в абсолютное время
+            self._token_expires_at = time.time() + expires_in
+        else:
+            # Если нет expires_in, используем expires_at (если это абсолютное время)
+            expires_at = auth_result.get("expires_at")
+            if isinstance(expires_at, (int, float)):
+                # Проверяем, является ли это timestamp (большое число) или временем жизни (меньше 1 дня)
+                if expires_at > time.time() + 86400:  # больше чем через день
+                    # Это абсолютное время
+                    self._token_expires_at = expires_at
+                else:
+                    # Это время жизни, преобразуем в абсолютное
+                    self._token_expires_at = time.time() + expires_at
+            else:
+                # По умолчанию устанавливаем время истечения через 9 минут (540 секунд)
+                self._token_expires_at = time.time() + 540
 
         if not self._access_token:
             raise GigaChatError("Failed to obtain access token")
@@ -202,6 +241,14 @@ class GigaChatClient:
 
         try:
             prompt = self._create_analysis_prompt(analysis_result)
+
+            # Убедимся, что токен аутентификации действителен
+            await self.authenticate()
+            
+            # Проверяем, что токен действительно установлен после аутентификации
+            if not self._access_token:
+                logger.error("Failed to obtain access token for analysis request")
+                return None
 
             chat_url = f"{self.api_url}/chat/completions"
             request_data = {
@@ -558,6 +605,15 @@ class GigaChatClient:
 
         try:
             prompt = self._create_detailed_analysis_prompt(timed_result_dict)
+
+            # Убедимся, что токен аутентификации действителен
+            await self.authenticate()
+            
+            # Проверяем, что токен действительно установлен после аутентификации
+            if not self._access_token:
+                logger.error("Failed to obtain access token for detailed analysis request")
+                processing_time = time.time() - start_time
+                return self._create_error_response("Failed to authenticate", processing_time)
 
             chat_url = f"{self.api_url}/chat/completions"
             request_data = {

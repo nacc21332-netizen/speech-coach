@@ -74,6 +74,14 @@ async def chat_with_gigachat(
                 "content": msg.content
             })
         
+        # Убедимся, что токен аутентификации действителен
+        await gigachat_client.authenticate()
+        
+        # Проверяем, что токен действительно установлен после аутентификации
+        if not gigachat_client._access_token:
+            logger.error("Failed to obtain access token for chat request")
+            raise HTTPException(status_code=500, detail="Failed to authenticate with GigaChat API")
+        
         # Отправляем запрос в GigaChat
         chat_url = f"{gigachat_client.api_url}/chat/completions"
         
@@ -89,10 +97,6 @@ async def chat_with_gigachat(
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
-
-        # Убедимся, что токен аутентификации действителен
-        if not gigachat_client._access_token:
-            await gigachat_client.authenticate()
 
         logger.info(f"Sending chat request to GigaChat with {len(formatted_messages)} messages...")
         
@@ -169,6 +173,14 @@ async def analyze_followup_chat(
                 "content": msg.content
             })
         
+        # Убедимся, что токен аутентификации действителен
+        await gigachat_client.authenticate()
+        
+        # Проверяем, что токен действительно установлен после аутентификации
+        if not gigachat_client._access_token:
+            logger.error("Failed to obtain access token for analysis follow-up chat request")
+            raise HTTPException(status_code=500, detail="Failed to authenticate with GigaChat API")
+        
         # Отправляем запрос в GigaChat
         chat_url = f"{gigachat_client.api_url}/chat/completions"
         
@@ -184,10 +196,6 @@ async def analyze_followup_chat(
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
-
-        # Убедимся, что токен аутентификации действителен
-        if not gigachat_client._access_token:
-            await gigachat_client.authenticate()
 
         logger.info(f"Sending analysis follow-up request to GigaChat...")
         
