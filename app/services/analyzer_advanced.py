@@ -187,9 +187,7 @@ class AdvancedSpeechAnalyzer:
             # Проверка на колебание
             is_hesitation = self._is_hesitation_word(word.word)
 
-            # Эмоциональный счет
-            emotion_score = self._calculate_emotion_score(
-                word, context_before, context_after)
+
 
             advanced_words.append(AdvancedWordTiming(
                 word=word.word,
@@ -202,7 +200,7 @@ class AdvancedSpeechAnalyzer:
                 is_hesitation=is_hesitation,
                 context_before=context_before,
                 context_after=context_after,
-                emotion_score=emotion_score
+                emotion_score=None
             ))
 
         return advanced_words
@@ -358,13 +356,19 @@ class AdvancedSpeechAnalyzer:
         """Анализирует акценты/эмоциональные моменты"""
         emphases = []
 
+        # Вычисляем средние значения для сравнения
+        durations = [w.duration for w in words if w.duration > 0]
+        avg_duration = sum(durations) / len(durations) if durations else 0.1
+        std_duration = (sum((d - avg_duration) ** 2 for d in durations) / len(durations)) ** 0.5 if durations else 0.05
+
         for i, word in enumerate(words):
-            # Проверяем на акцент по длительности слова
-            if word.duration > 0.5:  # Слово произносится дольше обычного
+            # Проверяем на акцент по длительности слова (сравнение со средним значением)
+            if word.duration > avg_duration + std_duration:  # Слово произносится значительно дольше обычного
+                intensity = min((word.duration - avg_duration) / (std_duration * 2), 1.0) if std_duration > 0 else min(word.duration / 0.5, 1.0)
                 emphases.append(EmphasisDetail(
                     timestamp=word.start,
                     type="duration",
-                    intensity=min(word.duration / 1.0, 1.0),
+                    intensity=intensity,
                     description=f"Длительное произнесение слова '{word.word}'",
                     context=self._get_context_window(words, i, -1, 1),
                     effectiveness=0.7,
@@ -383,14 +387,13 @@ class AdvancedSpeechAnalyzer:
                     suggestion="Повтор может быть эффективным, но не злоупотребляйте им"
                 ))
 
-            # Проверяем на эмоциональные слова (акцент по содержанию)
-            emotional_words = {
-                "очень", "важно", "критично", "серьезно", "особенно", 
-                "прежде", "всего", "именно", "как", "раз", "так", "вот"
+            # Проверяем на слова, которые часто используются для усиления
+            emphasis_words = {
+                "очень": 0.6, "важно": 0.8, "критично": 0.8, "серьезно": 0.7,
+                "особенно": 0.7, "прежде": 0.7, "всего": 0.7, "именно": 0.7, "как": 0.6, "раз": 0.6, "так": 0.6, "вот": 0.6
             }
-            if word.word.lower() in emotional_words:
+            if word.word.lower() in emphasis_words:
                 # Проверяем, есть ли усиление по сравнению со средним уровнем
-                avg_duration = sum(w.duration for w in words) / len(words) if words else 0.1
                 duration_factor = word.duration / avg_duration if avg_duration > 0 else 1.0
                 intensity = min(0.5 + duration_factor * 0.3, 1.0)
                 
@@ -398,7 +401,7 @@ class AdvancedSpeechAnalyzer:
                     timestamp=word.start,
                     type="content",
                     intensity=intensity,
-                    description=f"Эмоциональное/усиленное слово '{word.word}'",
+                    description=f"Усиленное слово '{word.word}'",
                     context=self._get_context_window(words, i, -1, 1),
                     effectiveness=0.8,
                     suggestion="Хорошее использование эмоционального акцента"
@@ -417,6 +420,29 @@ class AdvancedSpeechAnalyzer:
                         context=self._get_context_window(words, i, -1, 1),
                         effectiveness=0.9,
                         suggestion="Хорошее использование паузы для акцента"
+                    ))
+
+            # Проверяем на резкое изменение темпа речи по сравнению с окружением
+            if i > 0 and i < len(words) - 1:
+                prev_word = words[i-1]
+                next_word = words[i+1]
+                
+                # Рассчитываем относительную скорость произнесения текущего слова
+                relative_duration = word.duration / avg_duration if avg_duration > 0 else 1.0
+                
+                # Если слово значительно короче или длиннее среднего, и отличается от соседних
+                if abs(relative_duration - 1.0) > 0.5:  # Слово в 2+ раза короче или длиннее среднего
+                    speed_type = "speed" if relative_duration < 0.7 else "duration"
+                    speed_intensity = min(abs(relative_duration - 1.0), 1.0)
+                    
+                    emphases.append(EmphasisDetail(
+                        timestamp=word.start,
+                        type=speed_type,
+                        intensity=speed_intensity,
+                        description=f"Изменение темпа речи на слове '{word.word}'",
+                        context=self._get_context_window(words, i, -1, 1),
+                        effectiveness=0.7,
+                        suggestion="Изменение темпа может использоваться для акцента"
                     ))
 
         return emphases
@@ -606,8 +632,8 @@ class AdvancedSpeechAnalyzer:
         clarity_score = self._calculate_clarity_score(
             words, avg_pause_duration)
 
-        # Эмоциональность
-        emotion_score = sum(w.emotion_score or 0 for w in words) / len(words)
+        # Эмоциональность (теперь не определяется по аудио, поэтому 0)
+        emotion_score = 0
 
         return PhraseDetail(
             id=phrase_id,
@@ -660,27 +686,6 @@ class AdvancedSpeechAnalyzer:
         ]
         word_lower = word.lower()
         return any(re.match(pattern, word_lower) for pattern in hesitation_patterns)
-
-    def _calculate_emotion_score(self, word: WordTiming,
-                                 context_before: str, context_after: str) -> float:
-        """Рассчитывает эмоциональный счет слова"""
-        score = 0.0
-
-        # Эмоциональные слова
-        emotional_words = {
-            "отлично": 0.8, "прекрасно": 0.9, "ужасно": 0.7,
-            "важно": 0.6, "критично": 0.8, "срочно": 0.7,
-            "потрясающе": 0.9, "восхитительно": 0.9, "удивительно": 0.8
-        }
-
-        if word.word.lower() in emotional_words:
-            score = emotional_words[word.word.lower()]
-
-        # Восклицательные знаки в контексте
-        if "!" in context_before or "!" in context_after:
-            score = max(score, 0.6)
-
-        return score
 
     def _identify_filler_type(self, word: str) -> str:
         """Идентифицирует тип слова-паразита"""
@@ -1081,56 +1086,8 @@ class AdvancedSpeechAnalyzer:
 
     def _build_emotion_timeline(self, words: List[AdvancedWordTiming],
                                 emphases: List[EmphasisDetail]) -> List[Dict[str, Any]]:
-        """Строит временную шкалу эмоциональности"""
-        if not words:
-            return []
-
-        timeline = []
-
-        # Используем окна по 10 секунд
-        window_size = 10.0
-        total_duration = max(w.end for w in words)
-        current_start = 0.0
-
-        while current_start < total_duration:
-            window_end = min(current_start + window_size, total_duration)
-
-            # Слова в окне
-            window_words = [
-                w for w in words
-                if w.start >= current_start and w.end <= window_end
-            ]
-
-            # Эмоциональный счет
-            emotion_score = 0.0
-            if window_words:
-                emotion_score = sum(
-                    w.emotion_score or 0 for w in window_words) / len(window_words)
-
-            # Акценты в окне
-            window_emphases = [
-                e for e in emphases
-                if current_start <= e.timestamp <= window_end
-            ]
-
-            # Определяем доминирующую эмоцию
-            dominant_emotion = "neutral"
-            if emotion_score > 0.7:
-                dominant_emotion = "high"
-            elif emotion_score > 0.4:
-                dominant_emotion = "medium"
-
-            timeline.append({
-                "start": round(current_start, 2),
-                "end": round(window_end, 2),
-                "emotion_score": round(emotion_score, 2),
-                "dominant_emotion": dominant_emotion,
-                "emphasis_count": len(window_emphases)
-            })
-
-            current_start += window_size
-
-        return timeline
+        """Строит временную шкалу эмоциональности (теперь пустую, т.к. эмоциональность не определяется по аудио)"""
+        return []
 
     def _group_fillers_by_type(self, fillers: List[FillerWordDetail]) -> List[Dict[str, Any]]:
         """Группирует слова-паразиты по типу"""
