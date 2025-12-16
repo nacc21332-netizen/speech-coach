@@ -15,6 +15,7 @@ class SpeechElementType(str, Enum):
     QUESTION = "question"
     EMPHASIS = "emphasis"
     HESITATION = "hesitation"
+    PROBLEMATIC = "problematic"
 
 
 class WordTiming(BaseModel):
@@ -125,7 +126,7 @@ class EmphasisDetail(BaseModel):
     """Акценты/эмоциональные моменты"""
     timestamp: float = Field(description="Время акцента в секундах")
     type: Literal["volume", "speed", "pitch", "pause",
-                  "repetition"] = Field("volume", description="Тип акцента")
+                  "repetition", "duration", "content"] = Field("volume", description="Тип акцента")
     intensity: float = Field(
         0.5, ge=0.0, le=1.0, description="Интенсивность акцента (0-1)")
     description: str = Field(description="Описание акцента")
@@ -142,7 +143,9 @@ class SuspiciousMoment(BaseModel):
     timestamp: float = Field(description="Время момента в секундах")
     type: Literal["long_pause", "excessive_filler", "fast_speech",
                   "slow_speech", "repetition", "hesitation",
-                  "incoherence", "monotone", "volume_drop"] = Field("long_pause", description="Тип проблемы")
+                  "incoherence", "monotone", "volume_drop", 
+                  "stuttering", "trailing_off", "excessive_emphasis",
+                  "frequent_correction"] = Field("long_pause", description="Тип проблемы")
     severity: Literal["low", "medium", "high", "critical"] = Field(
         "medium", description="Серьезность проблемы")
     duration: float = Field(description="Длительность проблемы в секундах")

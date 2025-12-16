@@ -354,17 +354,16 @@ class AdvancedSpeechAnalyzer:
 
         return questions
 
-    # В методе _analyze_emphases исправляем:
     def _analyze_emphases(self, words: List[AdvancedWordTiming]) -> List[EmphasisDetail]:
         """Анализирует акценты/эмоциональные моменты"""
         emphases = []
 
         for i, word in enumerate(words):
-            # Проверяем на акцент по длительности слова - меняем тип с "duration" на "pause"
+            # Проверяем на акцент по длительности слова
             if word.duration > 0.5:  # Слово произносится дольше обычного
                 emphases.append(EmphasisDetail(
                     timestamp=word.start,
-                    type="pause",  # Изменено с "duration" на "pause"
+                    type="duration",
                     intensity=min(word.duration / 1.0, 1.0),
                     description=f"Длительное произнесение слова '{word.word}'",
                     context=self._get_context_window(words, i, -1, 1),
@@ -383,6 +382,42 @@ class AdvancedSpeechAnalyzer:
                     effectiveness=0.6,
                     suggestion="Повтор может быть эффективным, но не злоупотребляйте им"
                 ))
+
+            # Проверяем на эмоциональные слова (акцент по содержанию)
+            emotional_words = {
+                "очень", "важно", "критично", "серьезно", "особенно", 
+                "прежде", "всего", "именно", "как", "раз", "так", "вот"
+            }
+            if word.word.lower() in emotional_words:
+                # Проверяем, есть ли усиление по сравнению со средним уровнем
+                avg_duration = sum(w.duration for w in words) / len(words) if words else 0.1
+                duration_factor = word.duration / avg_duration if avg_duration > 0 else 1.0
+                intensity = min(0.5 + duration_factor * 0.3, 1.0)
+                
+                emphases.append(EmphasisDetail(
+                    timestamp=word.start,
+                    type="content",
+                    intensity=intensity,
+                    description=f"Эмоциональное/усиленное слово '{word.word}'",
+                    context=self._get_context_window(words, i, -1, 1),
+                    effectiveness=0.8,
+                    suggestion="Хорошее использование эмоционального акцента"
+                ))
+
+            # Проверяем на начало фразы/паузу перед словом (акцент через паузу)
+            if i > 0:
+                prev_word = words[i-1]
+                pause_before = word.start - prev_word.end
+                if pause_before > 0.8:  # Длинная пауза перед словом
+                    emphases.append(EmphasisDetail(
+                        timestamp=word.start,
+                        type="pause",
+                        intensity=min(pause_before / 2.0, 1.0),
+                        description=f"Акцент через паузу перед словом '{word.word}'",
+                        context=self._get_context_window(words, i, -1, 1),
+                        effectiveness=0.9,
+                        suggestion="Хорошее использование паузы для акцента"
+                    ))
 
         return emphases
 
@@ -426,6 +461,92 @@ class AdvancedSpeechAnalyzer:
                     self._create_complex_phrase_moment(moment_id, phrase))
                 moment_id += 1
 
+        # 5. Моменты колебания/нерешительности
+        hesitation_moments = self._find_hesitation_moments(words, pauses)
+        for hesitation in hesitation_moments:
+            moments.append(hesitation)
+            moment_id += 1
+
+        return moments
+
+    def _find_hesitation_moments(self, words: List[AdvancedWordTiming], 
+                                 pauses: List[PauseDetail]) -> List[SuspiciousMoment]:
+        """Находит моменты колебания/нерешительности"""
+        moments = []
+        moment_id = 0
+        
+        # 1. Проверяем слова с признаками колебания
+        for i, word in enumerate(words):
+            if word.is_hesitation:
+                moments.append(SuspiciousMoment(
+                    id=moment_id,
+                    timestamp=word.start,
+                    type="hesitation",
+                    severity="medium",
+                    duration=word.duration,
+                    description=f"Колебание/нерешительность: '{word.word}'",
+                    suggestion="Избегайте звуков нерешительности, делайте короткую паузу вместо 'эээ', 'ааа'",
+                    context_before=word.context_before or "",
+                    context_after=word.context_after or "",
+                    confidence=0.8,
+                    words_affected=[word.word],
+                    improvement_potential=0.7
+                ))
+                moment_id += 1
+        
+        # 2. Проверяем частые короткие паузы подряд (признак нерешительности)
+        for i in range(len(pauses) - 1):
+            current_pause = pauses[i]
+            next_pause = pauses[i + 1]
+            
+            # Если между паузами мало слов - это может быть нерешительность
+            words_between = [w for w in words 
+                           if current_pause.end <= w.start and w.end <= next_pause.start]
+            
+            if len(words_between) <= 1 and abs(current_pause.end - next_pause.start) < 2.0:
+                # Две короткие паузы близко друг к другу
+                if current_pause.duration < 1.0 and next_pause.duration < 1.0:
+                    moments.append(SuspiciousMoment(
+                        id=moment_id,
+                        timestamp=current_pause.start,
+                        type="hesitation",
+                        severity="medium",
+                        duration=current_pause.duration + next_pause.duration,
+                        description="Частые короткие паузы, признак нерешительности",
+                        suggestion="Стремитесь к более плавному потоку речи, избегайте частых остановок",
+                        context_before=current_pause.context_before,
+                        context_after=next_pause.context_after,
+                        confidence=0.6,
+                        words_affected=[current_pause.before_word, next_pause.before_word] 
+                                    if current_pause.before_word and next_pause.before_word else [],
+                        improvement_potential=0.6
+                    ))
+                    moment_id += 1
+        
+        # 3. Проверяем слова-паразиты, идущие подряд
+        for i in range(len(words) - 1):
+            current_word = words[i]
+            next_word = words[i + 1]
+            
+            if current_word.is_filler and next_word.is_filler:
+                time_gap = next_word.start - current_word.end
+                if time_gap < 1.0:  # Слова-паразиты идут подряд
+                    moments.append(SuspiciousMoment(
+                        id=moment_id,
+                        timestamp=current_word.start,
+                        type="hesitation",
+                        severity="high",
+                        duration=time_gap + current_word.duration + next_word.duration,
+                        description=f"Скопление слов-паразитов: '{current_word.word}' и '{next_word.word}'",
+                        suggestion="Замените скопления слов-паразитов на короткую паузу или переходное выражение",
+                        context_before=current_word.context_before or "",
+                        context_after=next_word.context_after or "",
+                        confidence=0.8,
+                        words_affected=[current_word.word, next_word.word],
+                        improvement_potential=0.8
+                    ))
+                    moment_id += 1
+        
         return moments
 
     def _create_phrase(self, phrase_id: int, words: List[AdvancedWordTiming],

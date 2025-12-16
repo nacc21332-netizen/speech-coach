@@ -24,7 +24,7 @@ class EmotionalPeak(BaseModel):
     """Эмоциональный пик"""
     timestamp: float
     intensity: float  # 0-1
-    type: Literal["volume", "speed", "pause"]
+    type: Literal["volume", "speed", "pause", "duration", "repetition", "content"]
     description: str
 
 
