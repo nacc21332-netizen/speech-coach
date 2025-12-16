@@ -331,12 +331,13 @@ class SpeechAnalysisPipeline:
         logger.info("Анализ метрик речи с таймингами...")
 
         try:
-            # Run analyzer in thread pool (CPU-bound operations)
-            result = await asyncio.to_thread(
-                self.analyzer.analyze,
+            # Run analyzer with async support for contextual analysis
+            result = await self.analyzer.analyze(
                 transcript,
                 audio_path,
-                self.include_timings
+                self.include_timings,
+                gigachat_client=self.gigachat_client,
+                cache=self.cache
             )
 
             # Дополнительная проверка результата

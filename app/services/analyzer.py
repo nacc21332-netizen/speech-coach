@@ -8,6 +8,8 @@ import struct
 import math
 from pathlib import Path
 from pydantic import BaseModel
+from app.services.gigachat import GigaChatClient
+from app.services.cache import AnalysisCache
 
 from app.models.transcript import Transcript, TranscriptSegment, WordTiming
 from app.models.timed_analysis import (
@@ -98,11 +100,13 @@ class EnhancedAnalysisResult(BaseModel):
 
 
 class SpeechAnalyzer:
-    def analyze(
+    async def analyze(
         self,
         transcript: Transcript,
         audio_path: Path | None = None,
         include_timings: bool = True,
+        gigachat_client: Optional[GigaChatClient] = None,
+        cache: Optional[AnalysisCache] = None,
     ) -> EnhancedAnalysisResult:
         """
         Анализирует речь с возможностью включения таймингов.
@@ -114,7 +118,7 @@ class SpeechAnalyzer:
         timed_data = TimedAnalysisData()
 
         if include_timings and transcript.word_timings:
-            timed_data = self._analyze_with_timings(transcript, audio_path)
+            timed_data = await self._analyze_with_timings(transcript, audio_path, gigachat_client, cache)
 
         return EnhancedAnalysisResult(
             **base_result.dict(),
@@ -184,14 +188,14 @@ class SpeechAnalyzer:
             gigachat_analysis=None,
         )
 
-    def _analyze_with_timings(self, transcript: Transcript, audio_path: Path | None = None) -> TimedAnalysisData:
+    async def _analyze_with_timings(self, transcript: Transcript, audio_path: Path | None = None, gigachat_client: Optional[GigaChatClient] = None, cache: Optional[AnalysisCache] = None) -> TimedAnalysisData:
         """Анализ с использованием таймингов слов"""
         if not transcript.word_timings:
             return TimedAnalysisData()
 
         return TimedAnalysisData(
-            filler_words_detailed=self._find_fillers_with_exact_timings(
-                transcript),
+            filler_words_detailed=await self._find_fillers_with_exact_timings(
+                transcript, gigachat_client, cache),
             pauses_detailed=self._analyze_pauses_with_word_timings(transcript, audio_path),
             speech_rate_windows=self._calculate_speech_windows_by_words(
                 transcript),
@@ -199,28 +203,35 @@ class SpeechAnalyzer:
             speaking_activity=self._build_speaking_activity(transcript),
         )
 
-    def _find_fillers_with_exact_timings(self, transcript: Transcript) -> List[TimedFillerWord]:
-        """Находит слова-паразиты с точными таймингами"""
-        fillers = []
-        for word_timing in transcript.word_timings:
-            word_text = word_timing.word.lower().strip().strip(",.!?;:()\"'")
-            # Нормализуем повторяющиеся символы (например, 'ээээ' -> 'ээ')
-            word_text_norm = re.sub(r"(.)\1{2,}", r"\1\1", word_text)
-            word_text_norm = word_text_norm.replace("-", " ")
+    async def _find_fillers_with_exact_timings(self, transcript: Transcript, gigachat_client: Optional[GigaChatClient] = None, cache: Optional[AnalysisCache] = None) -> List[TimedFillerWord]:
+        """Находит слова-паразиты с точными таймингами, используя контекстный анализ при наличии GigaChat клиента"""
+        if gigachat_client is not None and settings.llm_fillers_enabled:
+            # Используем контекстный анализ с GigaChat
+            from app.services.contextual_filler_analyzer import ContextualFillerAnalyzer
+            contextual_analyzer = ContextualFillerAnalyzer(gigachat_client, cache)
+            return await contextual_analyzer.analyze_fillers_with_context(transcript)
+        else:
+            # Используем базовый анализ без контекста
+            fillers = []
+            for word_timing in transcript.word_timings:
+                word_text = word_timing.word.lower().strip().strip(",.!?;:()\"'")
+                # Нормализуем повторяющиеся символы (например, 'ээээ' -> 'ээ')
+                word_text_norm = re.sub(r"(.)\1{2,}", r"\1\1", word_text)
+                word_text_norm = word_text_norm.replace("-", " ")
 
-            for filler_name, pattern in COMPILED_FILLERS:
-                # Используем search на нормализованной версии
-                if pattern.search(word_text) or pattern.search(word_text_norm) or (filler_name in word_text_norm):
-                    fillers.append(TimedFillerWord(
-                        word=filler_name,
-                        timestamp=round(word_timing.start, 3),
-                        exact_word=word_timing.word,
-                        confidence=word_timing.confidence,
-                        duration=round(max(0.0, word_timing.end - word_timing.start), 3)
-                    ))
-                    break
+                for filler_name, pattern in COMPILED_FILLERS:
+                    # Используем search на нормализованной версии
+                    if pattern.search(word_text) or pattern.search(word_text_norm) or (filler_name in word_text_norm):
+                        fillers.append(TimedFillerWord(
+                            word=filler_name,
+                            timestamp=round(word_timing.start, 3),
+                            exact_word=word_timing.word,
+                            confidence=word_timing.confidence,
+                            duration=round(max(0.0, word_timing.end - word_timing.start), 3)
+                        ))
+                        break
 
-        return fillers
+            return fillers
 
     def _analyze_pauses_with_word_timings(self, transcript: Transcript, audio_path: Path | None = None) -> List[TimedPause]:
         """Анализирует паузы между словами"""
