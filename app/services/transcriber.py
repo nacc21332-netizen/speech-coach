@@ -4,9 +4,14 @@ import pickle
 from pathlib import Path
 from typing import Protocol, List
 
-from faster_whisper import WhisperModel
-
 from app.core.config import settings
+
+try:
+    from faster_whisper import WhisperModel
+    _FASTER_WHISPER_AVAILABLE = True
+except ImportError:
+    _FASTER_WHISPER_AVAILABLE = False
+    WhisperModel = None
 from app.models.transcript import Transcript, TranscriptSegment, WordTiming
 
 logger = logging.getLogger(__name__)
@@ -40,23 +45,28 @@ class LocalWhisperTranscriber:
         # Создаем директорию для кэша транскрипций
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Loading Whisper model: {self.model_size} on {self.device}")
-        try:
-            self.model = WhisperModel(
-                self.model_size,
-                device=self.device,
-                compute_type=self.compute_type,
-            )
-            logger.info(f"Whisper model loaded successfully")
-            self._model_available = True
-        except Exception as e:
-            # If model cannot be downloaded/loaded (no internet or gated model),
-            # gracefully fall back to a no-op transcriber that returns an
-            # empty Transcript. This allows tests to run in offline CI.
-            logger.warning(f"Failed to load Whisper model '{self.model_size}': {e}")
-            logger.warning("Falling back to offline dummy transcriber (no word timings).")
+        if not _FASTER_WHISPER_AVAILABLE:
+            logger.warning("faster_whisper module not installed. Falling back to offline dummy transcriber.")
             self.model = None
             self._model_available = False
+        else:
+            logger.info(f"Loading Whisper model: {self.model_size} on {self.device}")
+            try:
+                self.model = WhisperModel(
+                    self.model_size,
+                    device=self.device,
+                    compute_type=self.compute_type,
+                )
+                logger.info(f"Whisper model loaded successfully")
+                self._model_available = True
+            except Exception as e:
+                # If model cannot be downloaded/loaded (no internet or gated model),
+                # gracefully fall back to a no-op transcriber that returns an
+                # empty Transcript. This allows tests to run in offline CI.
+                logger.warning(f"Failed to load Whisper model '{self.model_size}': {e}")
+                logger.warning("Falling back to offline dummy transcriber (no word timings).")
+                self.model = None
+                self._model_available = False
 
     def _get_cache_key(self, audio_path: Path) -> str:
         """Генерирует ключ кеша на основе пути к аудиофайлу и параметров модели"""

@@ -8,9 +8,25 @@ from app.services.transcriber import LocalWhisperTranscriber
 from app.services.analyzer import SpeechAnalyzer
 from app.services.gigachat import GigaChatClient
 from app.services.pipeline import SpeechAnalysisPipeline
+from app.services.cache import AnalysisCache
+from app.services.cache_manager import TwoLevelCache
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def get_cache_manager() -> TwoLevelCache:
+    """Создает двухуровневый кэш-менеджер (память + диск)"""
+    disk_cache = AnalysisCache(
+        cache_dir=Path(settings.cache_dir),
+        ttl_seconds=settings.cache_ttl
+    )
+    return TwoLevelCache(
+        disk_cache=disk_cache,
+        memory_maxsize=100,  # До 100 анализов в памяти
+        ttl_seconds=settings.cache_ttl
+    )
 
 
 @lru_cache(maxsize=1)

@@ -281,14 +281,14 @@ class AdvancedSpeechAnalysisPipeline(BasePipeline):
      - overall_assessment: краткая оценка (строка)
      - strengths: массив кратких пунктов (строки)
      - areas_for_improvement: массив кратких пунктов (строки)
-     - detailed_recommendations: массив объектов вида {
+     - detailed_recommendations: массив объектов вида {{
          "timestamp":  float (секунды) | null,
          "duration": float | null,
          "type": one of ["pause","filler","phrasing","tempo","emphasis"],
          "action": краткое действие (например, "сократить паузу до 0.5с", "заменить 'типа' на 'например'"),
          "rationale": краткое объяснение, почему это поможет,
          "confidence": 0..1
-       }
+       }}
      - key_insights: массив коротких наблюдений
      - confidence_score: число 0..1
 

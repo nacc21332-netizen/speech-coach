@@ -106,10 +106,11 @@ class Settings(BaseSettings):
     llm_fillers_max_tokens: int = Field(default=256, alias="LLM_FILLERS_MAX_TOKENS")
     llm_fillers_model: str = Field(default="GigaChat", alias="LLM_FILLERS_MODEL")
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False,
+    }
 
     @field_validator("max_file_size_mb")
     def validate_max_file_size(cls, v):

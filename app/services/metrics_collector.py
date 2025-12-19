@@ -1,5 +1,4 @@
 import time
-import psutil
 import logging
 from typing import Dict, Any
 from datetime import datetime
@@ -94,9 +93,19 @@ class MetricsCollector:
         end_time = time.time()
         processing_time = end_time - self._start_time
 
-        # Собираем метрики системы
-        process = psutil.Process()
-        memory_info = process.memory_info()
+        # Собираем метрики системы (psutil опционален)
+        memory_usage_mb = 0.0
+        cpu_percent = 0.0
+        try:
+            import psutil as _psutil
+            process = _psutil.Process()
+            memory_info = process.memory_info()
+            memory_usage_mb = memory_info.rss / (1024 * 1024)
+            cpu_percent = process.cpu_percent()
+        except Exception:
+            # psutil отсутствует или не доступен — используем значения по умолчанию
+            memory_usage_mb = 0.0
+            cpu_percent = 0.0
 
         metrics = ProcessingMetrics(
             filename=self._metrics["filename"],
@@ -109,8 +118,8 @@ class MetricsCollector:
                 "transcription", {}).get("duration", 0),
             analysis_time_sec=self._metrics["subtasks"].get(
                 "analysis", {}).get("duration", 0),
-            memory_usage_mb=memory_info.rss / (1024 * 1024),
-            cpu_percent=process.cpu_percent(),
+            memory_usage_mb=memory_usage_mb,
+            cpu_percent=cpu_percent,
             success=success,
             error_message=error_message
         )
@@ -124,8 +133,7 @@ class MetricsCollector:
         except RuntimeError:
             # Нет запущенного цикла - записываем синхронно
             self._save_metrics(metrics)
-        logger.info(f"Метрики обработки сохранены: {
-                    processing_time:.2f} секунд")
+        logger.info(f"Метрики обработки сохранены: {processing_time:.2f} секунд")
 
         # Сбрасываем состояние
         self._start_time = None

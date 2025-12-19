@@ -258,41 +258,36 @@ class GigaChatClient:
                 "messages": [
                     {
                         "role": "system",
-                        "content": """Ты опытный тренер по ораторскому искусству и публичным выступлениям. Твоя задача - дать глубокий и профессиональный анализ речи на основе предоставленных метрик и транскрипта. 
+                        "content": """Ты инструктор по публичным выступлениям, обучающий студентов навыкам ораторского мастерства.
 
-Ты должен проанализировать:
-1. Структуру и логичность выступления
-2. Эмоциональную окраску и убедительность
-3. Взаимодействие с аудиторией (по паузам, темпу речи)
-4. Использование профессиональной лексики
-5. Темп речи и ритмичность
-6. Наличие слов-паразитов и их влияние на восприятие
-7. Длину фраз и ясность выражения мыслей
-8. Общее впечатление от выступления
+Входные данные: транскрипт выступления + объективные метрики (темп, паузы, паразиты).
 
-Формат ответа: строго JSON без дополнительного текста. Все поля обязательны к заполнению, даже если данных недостаточно - дай лучшую оценку на основе доступной информации.
+Твоя задача: 
+1) Анализируй транскрипт как целое (структура, логика, ясность)
+2) Используй метрики как подтверждение/опровержение твоих выводов
+3) Дай КОНКРЕТНЫЕ, ВЫПОЛНИМЫЕ рекомендации
 
-Формат JSON:
-{
-    "overall_assessment": "Общая оценка выступления: сильные и слабые стороны, уровень подготовки, общее впечатление",
-    "strengths": [
-        "Первая сильная сторона с конкретным примером из выступления",
-        "Вторая сильная сторона с конкретным примером из выступления"
-    ],
-    "areas_for_improvement": [
-        "Первая зона роста с конкретным указанием проблемы",
-        "Вторая зона роста с конкретным указанием проблемы"
-    ],
-    "detailed_recommendations": [
-        "Конкретная рекомендация по улучшению с объяснением",
-        "Конкретная рекомендация по улучшению с объяснением"
-    ],
-    "key_insights": [
-        "Ключевой инсайт о стиле речи",
-        "Ключевой инсайт о взаимодействии с аудиторией"
-    ],
-    "confidence_score": "Число от 0 до 1, отражающее уверенность в анализе на основе полноты данных"
-}"""
+Критерии оценки (в порядке важности):
+- СОДЕРЖАНИЕ (организация, логика, полнота): 40%
+- ДОСТАВКА (беглость, уверенность, плавность): 30%
+- ЯСНОСТЬ (доступность языка, отсутствие двусмысленностей): 20%
+- ВЛИЯНИЕ (запоминаемость, убедительность): 10%
+
+Выходной формат: JSON. Структура точно как указано ниже.
+
+ЗАПРЕТЫ:
+- ❌ Не придумывай примеры, которых нет в транскрипте
+- ❌ Не добавляй метрики, которых я не дал
+- ❌ Если данных недостаточно, скажи "недостаточно информации" вместо выдумки
+- ❌ Не добавляй текст ДО JSON, не добавляй текст ПОСЛЕ JSON
+- ❌ Используй ТОЛЬКО двойные кавычки для строк в JSON
+
+КРИТИЧЕСКИЕ ПРАВИЛА:
+- ✅ Ссылайся на конкретные фрагменты транскрипта
+- ✅ Используй цифры из метрик, не придумывай новые
+- ✅ Каждая рекомендация должна быть ДЕЙСТВЕННОЙ (можно ли ее выполнить за неделю?)
+- ✅ Баланс похвалы и критики: минимум 50% хороших замечаний
+- ✅ Твой ответ ДОЛЖЕН быть валидным JSON без исключений"""
                     },
                     {"role": "user", "content": prompt}
                 ],
@@ -329,42 +324,18 @@ class GigaChatClient:
             parsed_content = self._parse_json_with_retries(content)
             
             if parsed_content is not None:
-                # Валидируем обязательные поля
-                required_fields = ["overall_assessment", "strengths", "areas_for_improvement",
-                                   "detailed_recommendations", "key_insights", "confidence_score"]
-
-                for field in required_fields:
-                    if field not in parsed_content or parsed_content[field] is None:
-                        if field == "confidence_score":
-                            parsed_content[field] = 0.5
-                        else:
-                            parsed_content[field] = ""
+                # Валидируем обязательные поля (новая структура)
+                validated = self._validate_and_normalize_analysis(parsed_content)
                 
-                # Убедимся, что overall_assessment не пустой, если другие поля заполнены
-                if not parsed_content["overall_assessment"].strip() and (
-                    parsed_content["strengths"] or 
-                    parsed_content["areas_for_improvement"] or 
-                    parsed_content["detailed_recommendations"] or 
-                    parsed_content["key_insights"]
-                ):
-                    parsed_content["overall_assessment"] = "Анализ выступления показал следующие результаты"
-
-                return GigaChatAnalysis(**parsed_content)
+                if validated is not None:
+                    return GigaChatAnalysis(**validated)
+                else:
+                    logger.warning("JSON parsed but validation failed")
+                    return self._create_fallback_analysis("JSON валидация не прошла")
             else:
                 logger.warning("Failed to parse GigaChat response after retries")
                 logger.debug(f"Raw content: {content[:500]}...")
-
-                # Создаем базовый ответ
-                return GigaChatAnalysis(
-                    overall_assessment="Анализ выполнен, но формат ответа не соответствует ожиданиям",
-                    strengths=["Получены метрики анализа речи"],
-                    areas_for_improvement=[
-                        "Требуется корректировка формата ответа GigaChat"],
-                    detailed_recommendations=[
-                        "Используйте базовый анализ для детальных метрик"],
-                    key_insights=["GigaChat вернул невалидный JSON формат"],
-                    confidence_score=0.2
-                )
+                return self._create_fallback_analysis("Невалидный формат JSON от GigaChat")
 
         except httpx.RequestError as e:
             logger.error(f"GigaChat API request failed: {e}")
@@ -374,7 +345,7 @@ class GigaChatClient:
             return None
 
     def _create_analysis_prompt(self, analysis_result: AnalysisResult) -> str:
-        """Создает промпт для анализа на основе результатов"""
+        """Создает оптимизированный промпт для анализа (вариант 3: Recommended)"""
         filler_items = ""
         for item in analysis_result.filler_words.items:
             if item.get("count", 0) > 0:
@@ -382,52 +353,162 @@ class GigaChatClient:
 
         pauses_info = ""
         if analysis_result.pauses.long_pauses:
-            pauses_info = "Длинные паузы:\n"
+            pauses_info = ""
             for pause in analysis_result.pauses.long_pauses[:3]:
                 pauses_info += f"- {pause['duration']:.1f} сек (с {pause['start']:.1f} по {pause['end']:.1f})\n"
 
-        advice_info = ""
-        for advice in analysis_result.advice:
-            advice_info += f"- {advice.title}: {advice.observation}\n"
+        # Интерпретация темпа
+        wpm = analysis_result.words_per_minute
+        tempo_interpretation = "очень быстро (> 160)" if wpm > 160 else "быстро (140-160)" if wpm > 140 else "оптимально (120-140)" if wpm > 120 else "медленно (< 120)"
 
-        prompt = f"""Проанализируй это публичное выступление:
+        # Интерпретация длины фраз
+        avg_phrase_len = analysis_result.phrases.avg_words
+        phrase_interpretation = "короткие фразы (< 5 слов) - может быть отрывисто" if avg_phrase_len < 5 else "средние (5-10) - норма" if avg_phrase_len < 10 else "длинные (> 10) - возможна усталость слушателя"
 
-=== ТРАНСКРИПТ ===
-{analysis_result.transcript[:3000]}{'... [текст сокращен]' if len(analysis_result.transcript) > 3000 else ''}
+        # Интерпретация паразитов
+        fillers_per_100 = analysis_result.filler_words.per_100_words
+        filler_interpretation = "ОТЛИЧНО" if fillers_per_100 < 2 else "ХОРОШО" if fillers_per_100 < 3 else "ТРЕБУЕТ РАБОТЫ" if fillers_per_100 < 5 else "КРИТИЧНО"
 
-=== МЕТРИКИ ===
-Длительность: {analysis_result.duration_sec:.1f} секунд
-Время говорения: {analysis_result.speaking_time_sec:.1f} секунд
-Коэффициент говорения: {analysis_result.speaking_ratio:.2%}
-Темп речи: {analysis_result.words_per_minute:.1f} слов/минуту
-Общее количество слов: {analysis_result.words_total}
+        # Интерпретация пауз
+        max_pause = analysis_result.pauses.max_sec
+        pause_interpretation = "очень длинные паузы - может выглядеть как растерянность" if max_pause > 3 else "нормальные паузы - хорошо" if max_pause > 1 else "очень короткие - мало дышит"
 
-Слова-паразиты: {analysis_result.filler_words.total} ({analysis_result.filler_words.per_100_words:.1f} на 100 слов)
-{f'Наиболее частые:\n{filler_items}' if filler_items else ''}
+        prompt = f"""АНАЛИЗИРУЙ ВЫСТУПЛЕНИЕ СТУДЕНТА:
 
-Количество пауз: {analysis_result.pauses.count}
-Средняя длина паузы: {analysis_result.pauses.avg_sec:.1f} секунд
-Самая длинная пауза: {analysis_result.pauses.max_sec:.1f} секунд
-{pauses_info if pauses_info else ''}
+═══════════════════════════════════════════════════════════════════════════════
+ОБЪЕКТИВНЫЕ ДАННЫЕ
+═══════════════════════════════════════════════════════════════════════════════
+Длительность выступления: {analysis_result.duration_sec:.1f} секунд
+Всего слов в выступлении: {analysis_result.words_total}
 
-Количество фраз: {analysis_result.phrases.count}
-Средняя длина фразы: {analysis_result.phrases.avg_words:.1f} слов
-Классификация длины фраз: {analysis_result.phrases.length_classification}
-Вариативность ритма: {analysis_result.phrases.rhythm_variation}
+ТЕМП РЕЧИ И БЕГЛОСТЬ:
+• Скорость речи: {wpm:.1f} слов/минуту
+  (Интерпретация: {tempo_interpretation})
 
-=== СТАНДАРТНЫЕ РЕКОМЕНДАЦИИ ===
-{advice_info}
+• Средняя длина фразы: {avg_phrase_len:.1f} слов
+  (Интерпретация: {phrase_interpretation})
 
-Дай развернутый анализ с учетом контекста публичного выступления.
-Обрати внимание на:
-1. Ясность и структурированность мысли
-2. Эмоциональную окраску речи
-3. Убедительность аргументации
-4. Взаимодействие с аудиторией (на основе пауз и темпа)
-5. Профессиональную лексику и терминологию
-6. Общее впечатление от выступления
+• Разнообразие темпа: {analysis_result.phrases.rhythm_variation}
+  
+ДИСФЛЮЕНТНОСТЬ (признаки неуверенности):
+• Слова-паразиты: {analysis_result.filler_words.total} всего
+• Частота паразитов: {fillers_per_100:.1f} на 100 слов
+  (Норма: < 2 на 100 слов | Текущий уровень: {filler_interpretation})
 
-Верни ответ строго в формате JSON, как указано в system prompt."""
+{f'• Самые частые: {filler_items}' if filler_items else ''}
+
+ПАУЗЫ (стратегия пауз):
+• Количество пауз: {analysis_result.pauses.count}
+• Средняя длина: {analysis_result.pauses.avg_sec:.2f} сек
+• Максимальная: {max_pause:.2f} сек
+  (Интерпретация: {pause_interpretation})
+
+{f'• {pauses_info}' if pauses_info else ''}
+
+═══════════════════════════════════════════════════════════════════════════════
+ПОЛНЫЙ ТРАНСКРИПТ (для анализа содержания)
+═══════════════════════════════════════════════════════════════════════════════
+{analysis_result.transcript}
+
+═══════════════════════════════════════════════════════════════════════════════
+ТВОЙ АНАЛИЗ: Ответь на эти вопросы мысленно перед JSON'ом
+═══════════════════════════════════════════════════════════════════════════════
+
+1️⃣ СТРУКТУРА (читаешь весь транскрипт снизу вверху):
+   - Четкое ли начало? Что первое слово/фраза?
+   - Развиваются ли идеи? Есть ли "поворотные моменты"?
+   - Сильное ли завершение? Или просто обрывается?
+   - Есть ли скрытые переходы ("во-первых", "следовательно", "в итоге")?
+
+2️⃣ СОДЕРЖАНИЕ (выделяешь основные идеи):
+   - Главная идея (в одном предложении)?
+   - Поддерживающие идеи? Примеры? Доказательства?
+   - Есть ли пустые места (идея высказана, но не развита)?
+
+3️⃣ СОГЛАСОВАННОСТЬ МЕТРИК И СОДЕРЖАНИЯ:
+   - Быстрый темп ({wpm:.0f} слов/мин) указывает на спешку или волнение?
+   - Паразиты ({fillers_per_100:.1f}/100) говорят о нерешительности?
+   - Пауз ({analysis_result.pauses.count} шт) — это обдумывание или неуверенность?
+
+4️⃣ ЯЗЫК И ДОСТУПНОСТЬ:
+   - Сложные ли термины? Объясняются ли?
+   - Предложения понятные? Не слишком сложные ли?
+   - Есть ли коллоквиализмы/жаргон?
+
+5️⃣ ВЕРНИ СТРУКТУРИРОВАННЫЙ JSON (строго как ниже, БЕЗ КАКИХ-ЛИБО ТЕКСТОВ ПЕРЕД ИЛИ ПОСЛЕ):
+
+{{
+    "выступление_анализ": {{
+        "общее_впечатление": "1-2 предложения о выступлении в целом",
+        "главная_идея": "Опиши в одном предложении основной месседж",
+        "оценка_из_100": число от 1 до 100
+    }},
+    
+    "структура_и_организация": {{
+        "есть_ли_четкая_структура": "да/нет + объяснение (2-3 предложения)",
+        "введение": "как оратор начинает? эффективное ли?",
+        "основная_часть": "развиваются ли идеи логично? найди 1-2 примера из текста",
+        "заключение": "сильное ли завершение? запоминается ли?",
+        "оценка": число 1-10
+    }},
+    
+    "содержание": {{
+        "основные_идеи": ["идея 1", "идея 2", "идея 3"],
+        "примеры_и_доказательства": "есть ли подтверждение каждой идеи? достаточно?",
+        "пропуски_или_слабости": ["слабость 1", "слабость 2"] или [],
+        "оценка": число 1-10
+    }},
+    
+    "язык_и_доступность": {{
+        "уровень_сложности": "простой/средний/сложный",
+        "проблемные_места": ["термин который не объяснен", "слишком сложное предложение"] или [],
+        "оценка": число 1-10
+    }},
+    
+    "доставка_и_беглость": {{
+        "интерпретация_темпа": "{wpm:.1f} слов/мин означает {tempo_interpretation}",
+        "интерпретация_паразитов": "{fillers_per_100:.1f}/100 слов указывает на {filler_interpretation}",
+        "интерпретация_пауз": "паузы используются так. Это [хорошо/плохо] потому что [объяснение]",
+        "общая_оценка_доставки": "уверенный/нервный/размеренный голос, [почему?]",
+        "оценка": число 1-10
+    }},
+    
+    "сильные_стороны": [
+        "Сильная сторона 1 (с примером из текста выступления)",
+        "Сильная сторона 2",
+        "Сильная сторона 3"
+    ],
+    
+    "области_для_улучшения": [
+        {{
+            "проблема": "ЧТО нужно улучшить (четко и конкретно)",
+            "причина": "ПОЧЕМУ это проблема",
+            "решение": "КАК это исправить (действенный совет)"
+        }},
+        {{
+            "проблема": "...",
+            "причина": "...",
+            "решение": "..."
+        }}
+    ],
+    
+    "главные_рекомендации": [
+        "Рекомендация 1: [действенный совет, который можно выполнить за неделю]",
+        "Рекомендация 2: [...]",
+        "Рекомендация 3: [...]",
+        "Рекомендация 4: [...]"
+    ],
+    
+    "приоритет_развития": "Какой ОДИН навык улучшить в первую очередь? (с объяснением)",
+    
+    "уровень_уверенности": число от 0 до 1
+}}
+
+ВАЖНО: 
+- Каждое утверждение подкреплено примерами из транскрипта
+- Рекомендации действенные, не общие фразы
+- Баланс: 50% похвалы, 50% критики
+- Используй метрики как подтверждение выводов"""
 
         return prompt
 
@@ -738,6 +819,95 @@ class GigaChatClient:
             return s
         except Exception:
             return content
+
+    def _validate_and_normalize_analysis(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Валидирует и нормализирует ответ анализа для новой структуры (вариант 3).
+        
+        Поддерживает оба формата:
+        - Старый: overall_assessment, strengths, areas_for_improvement, detailed_recommendations, key_insights
+        - Новый: выступление_анализ, структура_и_организация, содержание, язык_и_доступность, доставка_и_беглость
+        
+        Returns:
+            Нормализированный словарь для GigaChatAnalysis или None если невалидно
+        """
+        try:
+            # Определяем формат ответа
+            is_new_format = "выступление_анализ" in data
+            
+            if is_new_format:
+                # Конвертируем новый формат в старый для совместимости
+                analyzed = data.get("выступление_анализ", {})
+                
+                overall = analyzed.get("общее_впечатление", "")
+                strengths = data.get("сильные_стороны", [])
+                improvements = []
+                
+                # Преобразуем области улучшения из новой структуры
+                areas = data.get("области_для_улучшения", [])
+                if isinstance(areas, list):
+                    for area in areas:
+                        if isinstance(area, dict):
+                            improvements.append(f"{area.get('проблема', '')} → {area.get('решение', '')}")
+                        else:
+                            improvements.append(str(area))
+                
+                recommendations = data.get("главные_рекомендации", [])
+                insights = [data.get("приоритет_развития", "")]
+                confidence = data.get("уровень_уверенности", 0.7)
+                
+                normalized = {
+                    "overall_assessment": overall if overall else "Анализ выступления",
+                    "strengths": strengths if strengths else ["Выполнен анализ речи"],
+                    "areas_for_improvement": improvements if improvements else ["Требуется улучшение"],
+                    "detailed_recommendations": recommendations if recommendations else ["Работайте над рекомендациями"],
+                    "key_insights": [ins for ins in insights if ins],
+                    "confidence_score": float(confidence) if confidence else 0.7
+                }
+            else:
+                # Старый формат - просто валидируем
+                normalized = {
+                    "overall_assessment": str(data.get("overall_assessment", ""))[:1000],
+                    "strengths": data.get("strengths", []) or ["Анализ выполнен"],
+                    "areas_for_improvement": data.get("areas_for_improvement", []) or [],
+                    "detailed_recommendations": data.get("detailed_recommendations", []) or [],
+                    "key_insights": data.get("key_insights", []) or [],
+                    "confidence_score": float(data.get("confidence_score", 0.7))
+                }
+            
+            # Финальная валидация полей
+            if not normalized["overall_assessment"]:
+                normalized["overall_assessment"] = "Анализ публичного выступления выполнен"
+            
+            if not normalized["strengths"]:
+                normalized["strengths"] = ["Выполнен полный анализ речи"]
+            
+            if not isinstance(normalized["confidence_score"], (int, float)):
+                normalized["confidence_score"] = 0.7
+            
+            # Убедимся что значение confidence_score в диапазоне 0-1
+            normalized["confidence_score"] = max(0, min(1, float(normalized["confidence_score"])))
+            
+            return normalized
+            
+        except Exception as e:
+            logger.error(f"Validation error: {e}")
+            return None
+
+    def _create_fallback_analysis(self, error_reason: str) -> Optional[GigaChatAnalysis]:
+        """Создает fallback анализ при ошибке"""
+        try:
+            return GigaChatAnalysis(
+                overall_assessment=f"Анализ выполнен с ограничениями: {error_reason}",
+                strengths=["Получены объективные метрики анализа речи"],
+                areas_for_improvement=["Требуется улучшение работы с GigaChat API"],
+                detailed_recommendations=["Проверьте настройки API", "Используйте базовый анализ"],
+                key_insights=["Используйте доступные метрики для анализа"],
+                confidence_score=0.3
+            )
+        except Exception as e:
+            logger.error(f"Failed to create fallback analysis: {e}")
+            return None
 
     def _parse_json_with_retries(self, content: str, max_retries: int = 3):
         """

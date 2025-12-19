@@ -1,4 +1,6 @@
 import logging
+import uuid
+from contextvars import ContextVar
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -30,6 +32,13 @@ setup_logging(
 )
 
 logger = logging.getLogger(__name__)
+
+# Контекст для Request ID
+request_id_var: ContextVar[str] = ContextVar('request_id', default='')
+
+def get_request_id() -> str:
+    """Получить текущий Request ID"""
+    return request_id_var.get()
 
 app = FastAPI(
     title="Speech Coach API",
@@ -136,6 +145,20 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Request ID middleware (должен быть после CORS)
+@app.middleware("http")
+async def add_request_id_middleware(request: Request, call_next):
+    """Добавляет уникальный Request ID для каждого запроса"""
+    request_id = str(uuid.uuid4())
+    request_id_var.set(request_id)
+    
+    response = await call_next(request)
+    
+    # Добавляем в headers для отладки
+    response.headers["X-Request-ID"] = request_id
+    
+    return response
 
 # Включаем роутеры
 app.include_router(health_router)

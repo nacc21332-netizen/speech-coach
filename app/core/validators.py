@@ -1,8 +1,13 @@
-import magic
 import mimetypes
 from pathlib import Path
 from typing import List, Tuple
 import logging
+
+try:
+    import magic
+    _MAGIC_AVAILABLE = True
+except ImportError:
+    _MAGIC_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -46,13 +51,16 @@ class FileValidator:
                 return False, f"Неподдерживаемое расширение. Разрешены: {', '.join(allowed_extensions)}"
 
             # Определение MIME-типа
-            try:
-                mime_type = magic.from_file(str(file_path), mime=True)
-                if not mime_type.startswith('video/'):
-                    logger.warning(
-                        f"Файл имеет MIME-тип {mime_type}, но ожидался видео")
-            except ImportError:
-                logger.warning(
+            if _MAGIC_AVAILABLE:
+                try:
+                    mime_type = magic.from_file(str(file_path), mime=True)
+                    if not mime_type.startswith('video/'):
+                        logger.warning(
+                            f"Файл имеет MIME-тип {mime_type}, но ожидался видео")
+                except Exception as e:
+                    logger.warning(f"Ошибка определения MIME-типа: {e}")
+            else:
+                logger.debug(
                     "Библиотека python-magic не установлена, проверка MIME-типа пропущена")
 
             return True, "Файл валиден"
