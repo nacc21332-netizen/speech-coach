@@ -721,11 +721,25 @@
             document.getElementById('wpmValue').textContent = Math.round(analysisData.words_per_minute || 0);
 
             // Fillers count
-            const fillersCount = analysisData.fillers?.length || 0;
+            let fillersCount = 0;
+            if (Array.isArray(analysisData.fillers)) {
+                fillersCount = analysisData.fillers.length;
+            } else if (analysisData.fillers?.items && Array.isArray(analysisData.fillers.items)) {
+                fillersCount = analysisData.fillers.items.length;
+            } else if (analysisData.fillers?.total) {
+                fillersCount = analysisData.fillers.total;
+            }
             document.getElementById('fillersCountValue').textContent = fillersCount;
 
             // Pauses count
-            const pausesCount = analysisData.pauses?.length || 0;
+            let pausesCount = 0;
+            if (Array.isArray(analysisData.pauses)) {
+                pausesCount = analysisData.pauses.length;
+            } else if (analysisData.pauses?.items && Array.isArray(analysisData.pauses.items)) {
+                pausesCount = analysisData.pauses.items.length;
+            } else if (analysisData.pauses?.total) {
+                pausesCount = analysisData.pauses.total;
+            }
             document.getElementById('pausesCountValue').textContent = pausesCount;
 
             // Score calculation
@@ -736,8 +750,24 @@
         function calculateScore() {
             if (!analysisData) return 0;
 
-            const fillersCount = analysisData.fillers?.length || 0;
-            const pausesCount = analysisData.pauses?.length || 0;
+            let fillersCount = 0;
+            if (Array.isArray(analysisData.fillers)) {
+                fillersCount = analysisData.fillers.length;
+            } else if (analysisData.fillers?.items && Array.isArray(analysisData.fillers.items)) {
+                fillersCount = analysisData.fillers.items.length;
+            } else if (analysisData.fillers?.total) {
+                fillersCount = analysisData.fillers.total;
+            }
+
+            let pausesCount = 0;
+            if (Array.isArray(analysisData.pauses)) {
+                pausesCount = analysisData.pauses.length;
+            } else if (analysisData.pauses?.items && Array.isArray(analysisData.pauses.items)) {
+                pausesCount = analysisData.pauses.items.length;
+            } else if (analysisData.pauses?.total) {
+                pausesCount = analysisData.pauses.total;
+            }
+
             const baseScore = 100;
             const penalty = (fillersCount * 3) + (pausesCount * 1);
             const score = Math.max(0, baseScore - penalty);
@@ -786,7 +816,16 @@
         // FILLERS RENDERING
         // ============================================================================
         function renderFillersList() {
-            if (!analysisData.fillers || analysisData.fillers.length === 0) {
+            // Handle different data structures
+            let fillersList = [];
+            
+            if (Array.isArray(analysisData.fillers)) {
+                fillersList = analysisData.fillers;
+            } else if (analysisData.fillers && analysisData.fillers.items && Array.isArray(analysisData.fillers.items)) {
+                fillersList = analysisData.fillers.items;
+            }
+
+            if (!fillersList || fillersList.length === 0) {
                 document.getElementById('fillersList').innerHTML = `
                     <div class="empty-state">
                         <div class="empty-state-icon"><i class="fas fa-check-circle"></i></div>
@@ -796,7 +835,7 @@
                 return;
             }
 
-            const html = analysisData.fillers.map(filler => {
+            const html = fillersList.map(filler => {
                 const severity = filler.severity || 'low';
                 const severityColor = getSeverityColor(severity);
                 const severityLabel = getSeverityLabel(severity);
@@ -826,7 +865,16 @@
         // PAUSES RENDERING
         // ============================================================================
         function renderPausesList() {
-            if (!analysisData.pauses || analysisData.pauses.length === 0) {
+            // Handle different data structures
+            let pausesList = [];
+            
+            if (Array.isArray(analysisData.pauses)) {
+                pausesList = analysisData.pauses;
+            } else if (analysisData.pauses && analysisData.pauses.items && Array.isArray(analysisData.pauses.items)) {
+                pausesList = analysisData.pauses.items;
+            }
+
+            if (!pausesList || pausesList.length === 0) {
                 document.getElementById('pausesList').innerHTML = `
                     <div class="empty-state">
                         <div class="empty-state-icon"><i class="fas fa-check-circle"></i></div>
@@ -836,7 +884,7 @@
                 return;
             }
 
-            const html = analysisData.pauses.map(pause => {
+            const html = pausesList.map(pause => {
                 const excessive = pause.excessive || false;
                 const severityColor = excessive ? 'severity-high' : 'severity-low';
 
@@ -907,8 +955,26 @@
                 charts.problem = null;
             }
 
-            const fillersCount = analysisData.fillers?.length || 0;
-            const pausesCount = analysisData.pauses?.length || 0;
+            // Get fillers count
+            let fillersCount = 0;
+            if (Array.isArray(analysisData.fillers)) {
+                fillersCount = analysisData.fillers.length;
+            } else if (analysisData.fillers?.items && Array.isArray(analysisData.fillers.items)) {
+                fillersCount = analysisData.fillers.items.length;
+            } else if (analysisData.fillers?.total) {
+                fillersCount = analysisData.fillers.total;
+            }
+
+            // Get pauses count
+            let pausesCount = 0;
+            if (Array.isArray(analysisData.pauses)) {
+                pausesCount = analysisData.pauses.length;
+            } else if (analysisData.pauses?.items && Array.isArray(analysisData.pauses.items)) {
+                pausesCount = analysisData.pauses.items.length;
+            } else if (analysisData.pauses?.total) {
+                pausesCount = analysisData.pauses.total;
+            }
+
             const goodMoments = Math.max(1, Math.floor((analysisData.duration || 60) / 10) - fillersCount - pausesCount);
 
             charts.problem = new Chart(ctx, {
