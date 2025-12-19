@@ -8,53 +8,563 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <style>
-        .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --accent-hover: #79c0ff;
         }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .nav-bg {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-dark {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+        }
+
         .metric-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 12px;
-            padding: 20px;
-            color: white;
+            background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
+            border-radius: 8px;
+            padding: 1.5rem;
+            color: var(--bg-primary);
             text-align: center;
         }
+
         .tab-button {
-            padding: 12px 20px;
+            padding: 0.75rem 1.25rem;
             border-bottom: 3px solid transparent;
             transition: all 0.3s ease;
+            color: var(--text-secondary);
+            cursor: pointer;
         }
+
+        .tab-button:hover {
+            color: var(--text-primary);
+        }
+
         .tab-button.active {
-            border-bottom-color: #667eea;
-            color: #667eea;
+            border-bottom-color: var(--accent);
+            color: var(--accent);
             font-weight: bold;
         }
+
         .timeline-item {
-            padding: 12px;
-            margin: 8px 0;
-            border-left: 4px solid #667eea;
-            background: #f9fafb;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            border-left: 4px solid var(--accent);
+            background: var(--bg-secondary);
             border-radius: 4px;
         }
+
         .severity-high {
-            border-left-color: #ef4444;
-            background: #fef2f2;
+            border-left-color: #f85149;
+            background: rgba(248, 81, 73, 0.1);
         }
+
         .severity-medium {
-            border-left-color: #f59e0b;
-            background: #fffbf0;
+            border-left-color: #d29922;
+            background: rgba(210, 153, 34, 0.1);
         }
+
         .severity-low {
-            border-left-color: #10b981;
-            background: #f0fdf4;
+            border-left-color: #3fb950;
+            background: rgba(63, 185, 80, 0.1);
         }
+
         .chart-container {
             position: relative;
             height: 300px;
-            margin-bottom: 20px;
+            margin-bottom: 1.5rem;
+        }
+
+        .btn-primary {
+            background-color: var(--accent);
+            color: var(--bg-primary);
+            border: 1px solid var(--accent);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: var(--accent-hover);
         }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="antialiased">
+    <!-- Навигация -->
+    <nav class="nav-bg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex justify-between items-center h-16">
+                <a href="/" class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg border border-white/20 flex items-center justify-center">
+                        <i class="fas fa-microphone text-sm" style="color: var(--accent);"></i>
+                    </div>
+                    <h1 class="text-xl font-bold">Speech Coach</h1>
+                </a>
+                <a href="/upload" class="btn-primary text-sm">
+                    <i class="fas fa-upload mr-2"></i>Новый анализ
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Основной контент -->
+    <div class="max-w-7xl mx-auto px-6 py-12">
+        <!-- Заголовок -->
+        <div class="mb-8">
+            <h2 class="text-4xl font-bold mb-2">Результаты анализа</h2>
+            <p style="color: var(--text-secondary);">Детальный анализ вашего выступления с рекомендациями от AI-коуча</p>
+        </div>
+
+        <!-- Основные метрики -->
+        <div class="grid md:grid-cols-5 gap-4 mb-12">
+            <div class="metric-card">
+                <p class="text-sm opacity-90 mb-2">Длительность</p>
+                <h3 class="text-3xl font-bold" id="duration">--</h3>
+                <p class="text-xs opacity-75">минут</p>
+            </div>
+            <div class="metric-card">
+                <p class="text-sm opacity-90 mb-2">Темп речи</p>
+                <h3 class="text-3xl font-bold" id="wpm">--</h3>
+                <p class="text-xs opacity-75">слов/минуту</p>
+            </div>
+            <div class="metric-card">
+                <p class="text-sm opacity-90 mb-2">Слова-паразиты</p>
+                <h3 class="text-3xl font-bold" id="fillerCount">--</h3>
+                <p class="text-xs opacity-75">найдено</p>
+            </div>
+            <div class="metric-card">
+                <p class="text-sm opacity-90 mb-2">Паузы</p>
+                <h3 class="text-3xl font-bold" id="pauseCount">--</h3>
+                <p class="text-xs opacity-75">обнаружено</p>
+            </div>
+            <div class="metric-card">
+                <p class="text-sm opacity-90 mb-2">Оценка</p>
+                <h3 class="text-3xl font-bold" id="score">--</h3>
+                <p class="text-xs opacity-75">из 100</p>
+            </div>
+        </div>
+
+        <!-- Вкладки -->
+        <div class="card-dark rounded-lg overflow-hidden">
+            <!-- Заголовки вкладок -->
+            <div style="border-bottom: 1px solid var(--border-color);" class="flex overflow-x-auto">
+                <button class="tab-button active" onclick="switchTab('overview')">
+                    <i class="fas fa-chart-bar mr-2"></i>Обзор
+                </button>
+                <button class="tab-button" onclick="switchTab('fillers')">
+                    <i class="fas fa-comment-dots mr-2"></i>Слова-паразиты
+                </button>
+                <button class="tab-button" onclick="switchTab('pauses')">
+                    <i class="fas fa-pause-circle mr-2"></i>Паузы
+                </button>
+                <button class="tab-button" onclick="switchTab('recommendations')">
+                    <i class="fas fa-lightbulb mr-2"></i>Рекомендации
+                </button>
+                <button class="tab-button" onclick="switchTab('chat')">
+                    <i class="fas fa-comments mr-2"></i>Чат
+                </button>
+            </div>
+
+            <!-- Содержимое вкладок -->
+            <div class="p-8">
+                <!-- Вкладка "Обзор" -->
+                <div id="overview" class="tab-content">
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <!-- График распределения -->
+                        <div>
+                            <h3 class="text-xl font-bold mb-4">Распределение проблем</h3>
+                            <div class="chart-container">
+                                <canvas id="problemChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- График темпа -->
+                        <div>
+                            <h3 class="text-xl font-bold mb-4">Темп речи</h3>
+                            <div class="chart-container">
+                                <canvas id="tempoChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Общая оценка -->
+                    <div class="mt-8 p-6" style="background-color: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.2);" class="rounded-lg">
+                        <h3 class="text-xl font-bold mb-4">Общая оценка</h3>
+                        <p style="color: var(--text-secondary);" id="assessment">
+                            Загрузка оценки...
+                        </p>
+                    </div>
+
+                    <!-- Сильные стороны -->
+                    <div class="mt-8">
+                        <h3 class="text-xl font-bold mb-4">Сильные стороны</h3>
+                        <ul id="strengths" class="space-y-2">
+                            <li class="flex items-start">
+                                <i class="fas fa-check-circle text-green-500 mr-3 mt-1 flex-shrink-0"></i>
+                                <span style="color: var(--text-secondary);">Загрузка...</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Области для улучшения -->
+                    <div class="mt-8">
+                        <h3 class="text-xl font-bold mb-4">Области для улучшения</h3>
+                        <ul id="improvements" class="space-y-2">
+                            <li class="flex items-start">
+                                <i class="fas fa-exclamation-circle text-orange-500 mr-3 mt-1 flex-shrink-0"></i>
+                                <span style="color: var(--text-secondary);">Загрузка...</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Вкладка "Слова-паразиты" -->
+                <div id="fillers" class="tab-content hidden">
+                    <h3 class="text-xl font-bold mb-4">Найденные слова-паразиты</h3>
+                    <div id="fillersList" class="space-y-3">
+                        <p style="color: var(--text-secondary);">Загрузка списка слов-паразитов...</p>
+                    </div>
+                </div>
+
+                <!-- Вкладка "Паузы" -->
+                <div id="pauses" class="tab-content hidden">
+                    <h3 class="text-xl font-bold mb-4">Анализ пауз</h3>
+                    <div id="pausesList" class="space-y-3">
+                        <p style="color: var(--text-secondary);">Загрузка списка пауз...</p>
+                    </div>
+                </div>
+
+                <!-- Вкладка "Рекомендации" -->
+                <div id="recommendations" class="tab-content hidden">
+                    <h3 class="text-xl font-bold mb-4">AI-рекомендации</h3>
+                    <div id="recommendationsList" class="space-y-4">
+                        <p style="color: var(--text-secondary);">Загрузка рекомендаций...</p>
+                    </div>
+                </div>
+
+                <!-- Вкладка "Чат" -->
+                <div id="chat" class="tab-content hidden">
+                    <div class="flex flex-col h-96">
+                        <h3 class="text-xl font-bold mb-4">Чат с AI-коучем</h3>
+                        <div id="chatMessages" class="flex-1 overflow-y-auto rounded-lg p-4 mb-4" style="background-color: var(--bg-secondary); border: 1px solid var(--border-color);">
+                            <p style="color: var(--text-secondary);" class="text-center py-8">
+                                <i class="fas fa-comments text-3xl" style="color: var(--text-secondary);" class="mb-2 block"></i>
+                                Начните разговор, задав вопрос об анализе
+                            </p>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="chatInput" placeholder="Задайте вопрос об анализе..." class="flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" style="background-color: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary);">
+                            <button onclick="sendMessage()" class="btn-primary">
+                                <i class="fas fa-send"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let analysisData = null;
+        let chatHistory = [];
+
+        // Загрузка данных при инициализации
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedData = localStorage.getItem('analysisResult');
+            if (savedData) {
+                analysisData = JSON.parse(savedData);
+                renderResults();
+            } else {
+                document.body.innerHTML = '<div class="max-w-7xl mx-auto px-6 py-12"><p style="color: var(--text-secondary);" class="text-center">Данные анализа не найдены. <a href="/upload">Загрузите файл</a></p></div>';
+            }
+        });
+
+        function renderResults() {
+            if (!analysisData) return;
+
+            // Основные метрики
+            document.getElementById('duration').textContent = (analysisData.duration_sec / 60).toFixed(1);
+            document.getElementById('wpm').textContent = analysisData.words_per_minute?.toFixed(0) || '--';
+            document.getElementById('fillerCount').textContent = analysisData.fillers_count || '--';
+            document.getElementById('pauseCount').textContent = analysisData.pauses_count || '--';
+            document.getElementById('score').textContent = Math.round((100 - (analysisData.fillers_count || 0) * 5 - (analysisData.pauses_count || 0) * 2));
+
+            // Слова-паразиты
+            renderFillersList();
+
+            // Паузы
+            renderPausesList();
+
+            // GigaChat анализ (если доступен)
+            if (analysisData.gigachat_analysis) {
+                const ga = analysisData.gigachat_analysis;
+                document.getElementById('assessment').textContent = ga.overall_assessment || 'Анализ речи выполнен';
+                
+                // Сильные стороны
+                if (ga.strengths && Array.isArray(ga.strengths)) {
+                    document.getElementById('strengths').innerHTML = ga.strengths
+                        .map(s => `<li class="flex items-start"><i class="fas fa-check-circle text-green-500 mr-3 mt-1 flex-shrink-0"></i><span>${s}</span></li>`)
+                        .join('');
+                }
+
+                // Области для улучшения
+                if (ga.areas_for_improvement && Array.isArray(ga.areas_for_improvement)) {
+                    document.getElementById('improvements').innerHTML = ga.areas_for_improvement
+                        .map(i => `<li class="flex items-start"><i class="fas fa-exclamation-circle text-orange-500 mr-3 mt-1 flex-shrink-0"></i><span>${i}</span></li>`)
+                        .join('');
+                }
+
+                // Рекомендации
+                renderRecommendations();
+            }
+
+            // Графики
+            renderCharts();
+        }
+
+        function renderFillersList() {
+            const fillers = analysisData.timeline?.fillers || [];
+            const html = fillers.map(f => `
+                <div class="timeline-item">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="font-semibold">"${f.exact_word || f.word}"</span>
+                            <span style="color: var(--text-secondary);" class="text-sm ml-2">${f.timestamp?.toFixed(2)}с</span>
+                        </div>
+                        <span class="text-xs px-2 py-1 rounded-full ${
+                            f.severity === 'high' ? 'bg-red-900/30 text-red-400' :
+                            f.severity === 'medium' ? 'bg-yellow-900/30 text-yellow-400' :
+                            'bg-green-900/30 text-green-400'
+                        }">
+                            ${f.severity || 'normal'}
+                        </span>
+                    </div>
+                    <p style="color: var(--text-secondary);" class="text-sm mt-2">Контекст: "... ${f.context_before || ''} [СЛОВО] ${f.context_after || ''} ..."</p>
+                </div>
+            `).join('');
+            document.getElementById('fillersList').innerHTML = html || '<p style="color: var(--text-secondary);">Слова-паразиты не найдены</p>';
+        }
+
+        function renderPausesList() {
+            const pauses = analysisData.timeline?.pauses || [];
+            const html = pauses.slice(0, 20).map(p => `
+                <div class="timeline-item ${p.is_excessive ? 'severity-high' : 'severity-low'}">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="font-semibold">${p.duration?.toFixed(2)}с паузы</span>
+                            <span style="color: var(--text-secondary);" class="text-sm ml-2">c ${p.start?.toFixed(2)}с</span>
+                        </div>
+                        <span class="text-xs px-2 py-1 rounded-full ${p.is_excessive ? 'bg-red-900/30 text-red-400' : 'bg-green-900/30 text-green-400'}">
+                            ${p.is_excessive ? 'Длинная' : 'Нормальная'}
+                        </span>
+                    </div>
+                    <p style="color: var(--text-secondary);" class="text-sm mt-2">Тип: ${p.type || 'структурная'}</p>
+                </div>
+            `).join('');
+            document.getElementById('pausesList').innerHTML = html || '<p style="color: var(--text-secondary);">Длинные паузы не найдены</p>';
+        }
+
+        function renderRecommendations() {
+            const ga = analysisData.gigachat_analysis;
+            const recs = ga.detailed_recommendations || [];
+            const html = recs.map(r => `
+                <div style="border: 1px solid rgba(88, 166, 255, 0.2); background-color: rgba(88, 166, 255, 0.05);" class="p-4 rounded-lg">
+                    <div class="flex justify-between items-start mb-2">
+                        <h4 class="font-semibold">${r.action}</h4>
+                        <span style="color: var(--text-secondary);" class="text-sm">${r.timestamp ? r.timestamp.toFixed(2) + 'с' : 'N/A'}</span>
+                    </div>
+                    <p style="color: var(--text-secondary);" class="mb-2">${r.rationale}</p>
+                    <div class="flex justify-between items-center text-sm">
+                        <span style="color: var(--text-secondary);">Тип: <span class="font-semibold">${r.type}</span></span>
+                        <span style="color: var(--accent);">Уверенность: ${(r.confidence * 100).toFixed(0)}%</span>
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('recommendationsList').innerHTML = html || '<p style="color: var(--text-secondary);">Рекомендации не найдены</p>';
+        }
+
+        function renderCharts() {
+            // Конфиг для Chart.js с темной темой
+            const chartOptions = {
+                color: '#8b949e',
+                titleColor: '#e6edf3',
+                scales: {
+                    ticks: { color: '#8b949e' },
+                    grid: { color: '#30363d' }
+                }
+            };
+
+            // График проблем
+            const problemCtx = document.getElementById('problemChart');
+            if (problemCtx) {
+                new Chart(problemCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Слова-паразиты', 'Паузы', 'Другое'],
+                        datasets: [{
+                            data: [
+                                analysisData.fillers_count || 0,
+                                analysisData.pauses_count || 0,
+                                Math.max(0, 10 - (analysisData.fillers_count || 0) - (analysisData.pauses_count || 0))
+                            ],
+                            backgroundColor: ['#f85149', '#d29922', '#3fb950'],
+                            borderColor: '#161b22',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { color: '#e6edf3' }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // График темпа
+            const tempoCtx = document.getElementById('tempoChart');
+            if (tempoCtx) {
+                new Chart(tempoCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Начало', '1/4', '1/2', '3/4', 'Конец'],
+                        datasets: [{
+                            label: 'Слова в минуту',
+                            data: [
+                                analysisData.words_per_minute || 120,
+                                (analysisData.words_per_minute || 120) * 1.1,
+                                (analysisData.words_per_minute || 120) * 0.95,
+                                (analysisData.words_per_minute || 120) * 1.05,
+                                analysisData.words_per_minute || 120
+                            ],
+                            borderColor: '#58a6ff',
+                            backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#58a6ff',
+                            pointBorderColor: '#161b22'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: '#e6edf3' }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { color: '#8b949e' },
+                                grid: { color: '#30363d' }
+                            },
+                            x: {
+                                ticks: { color: '#8b949e' },
+                                grid: { color: '#30363d' }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function switchTab(tabName) {
+            // Скрыть все вкладки
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+
+            // Показать выбранную вкладку
+            document.getElementById(tabName).classList.remove('hidden');
+            event.target.closest('.tab-button')?.classList.add('active');
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            // Добавить сообщение пользователя
+            addChatMessage('user', message);
+            input.value = '';
+
+            // Отправить на сервер
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        context: analysisData
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    addChatMessage('assistant', data.response);
+                } else {
+                    addChatMessage('assistant', 'Ошибка при получении ответа');
+                }
+            } catch (error) {
+                addChatMessage('assistant', 'Ошибка подключения к серверу');
+            }
+        }
+
+        function addChatMessage(role, text) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageEl = document.createElement('div');
+            messageEl.className = role === 'user' 
+                ? 'mb-4 text-right' 
+                : 'mb-4 text-left';
+            
+            messageEl.innerHTML = `
+                <div class="inline-block max-w-xs px-4 py-2 rounded-lg ${
+                    role === 'user' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'text-white'
+                }" style="${role === 'assistant' ? 'background-color: var(--bg-secondary); border: 1px solid var(--border-color);' : ''}">
+                    ${text}
+                </div>
+            `;
+            
+            chatMessages.appendChild(messageEl);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    </script>
+</body>
+</html>
     <!-- Навигация -->
     <nav class="bg-white shadow-sm sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

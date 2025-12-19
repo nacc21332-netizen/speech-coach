@@ -11,7 +11,7 @@ from app.core.exceptions import (
     AnalysisError,
 )
 
-router = APIRouter(prefix="/api/v1", tags=["analysis"])
+router = APIRouter(prefix="/api", tags=["analysis"])
 logger = logging.getLogger(__name__)
 
 

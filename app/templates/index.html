@@ -3,282 +3,442 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Speech Coach - Анализ и совершенствование вашего выступления</title>
+    <title>Speech Coach - Анализ вашего выступления с AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent: #58a6ff;
+            --accent-hover: #79c0ff;
         }
-        .card-hover {
+
+        * {
+            color-scheme: dark;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .nav-bg {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-dark {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-primary {
+            background-color: var(--accent);
+            color: var(--bg-primary);
+            border: 1px solid var(--accent);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background-color: rgba(88, 166, 255, 0.1);
+            border-color: var(--accent-hover);
+            color: var(--accent-hover);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .feature-card {
+            padding: 1.5rem;
+            border-radius: 8px;
             transition: all 0.3s ease;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-tertiary);
         }
-        .card-hover:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+
+        .feature-card:hover {
+            background-color: rgba(88, 166, 255, 0.05);
+            border-color: var(--accent);
         }
-        .animate-fade-in {
-            animation: fadeIn 0.6s ease-in;
+
+        .divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, var(--border-color), transparent);
         }
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: var(--accent-hover);
+        }
+
+        .stat-box {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .hero-section {
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .feature-icon {
+            width: 3rem;
+            height: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(88, 166, 255, 0.1);
+            border: 1px solid rgba(88, 166, 255, 0.2);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .feature-icon i {
+            color: var(--accent);
+            font-size: 1.5rem;
+        }
+
+        .step-circle {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--bg-primary);
+            font-weight: bold;
+            flex-shrink: 0;
         }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="antialiased">
     <!-- Навигация -->
-    <nav class="bg-white shadow-sm sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav class="nav-bg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6">
             <div class="flex justify-between items-center h-16">
-                <div class="flex items-center">
-                    <i class="fas fa-microphone text-purple-600 text-2xl mr-3"></i>
-                    <h1 class="text-2xl font-bold text-gray-900">Speech Coach</h1>
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg border border-white/20 flex items-center justify-center">
+                        <i class="fas fa-microphone text-sm" style="color: var(--accent);"></i>
+                    </div>
+                    <h1 class="text-xl font-bold">Speech Coach</h1>
                 </div>
-                <div class="hidden md:flex space-x-8">
-                    <a href="#features" class="text-gray-700 hover:text-purple-600 transition">Возможности</a>
-                    <a href="#how-it-works" class="text-gray-700 hover:text-purple-600 transition">Как это работает</a>
-                    <a href="#contact" class="text-gray-700 hover:text-purple-600 transition">Контакты</a>
+                <div class="hidden md:flex items-center gap-8">
+                    <a href="#features" class="text-sm transition">Возможности</a>
+                    <a href="#how-it-works" class="text-sm transition">Как работает</a>
+                    <a href="#stats" class="text-sm transition">О сервисе</a>
                 </div>
-                <a href="/upload" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition">
-                    Начать анализ
+                <a href="/upload" class="btn-primary text-sm">
+                    <i class="fas fa-arrow-right mr-2"></i>Начать
                 </a>
             </div>
         </div>
     </nav>
 
-    <!-- Главный баннер -->
-    <div class="gradient-bg text-white py-20">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-5xl font-bold mb-6 animate-fade-in">
-                Совершенствуйте свое выступление с AI
-            </h2>
-            <p class="text-xl text-purple-100 mb-8 max-w-2xl mx-auto animate-fade-in">
-                Получайте детальный анализ вашей речи: паузы, слова-паразиты, темп, интонация. 
-                Обсуждайте результаты с умным чат-ботом, заточенным специально для коучинга выступлений.
-            </p>
-            <div class="flex gap-4 justify-center">
-                <a href="/upload" class="bg-white text-purple-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition inline-flex items-center">
-                    <i class="fas fa-arrow-right mr-2"></i>
-                    Загрузить видео или аудио
+    <!-- Главный раздел -->
+    <section class="hero-section">
+        <div class="max-w-4xl mx-auto">
+            <div class="mb-8">
+                <h2 class="text-5xl font-bold mb-6 leading-tight">
+                    Анализируйте вашу речь<br>
+                    <span class="gradient-text">с помощью AI</span>
+                </h2>
+                <p class="text-lg" style="color: var(--text-secondary);">
+                    Получайте детальный анализ паузы, слов-паразитов, темпа и интонации. 
+                    Обсуждайте результаты с умным AI-коучем на основе GigaChat.
+                </p>
+            </div>
+
+            <div class="flex gap-4 justify-center mb-16">
+                <a href="/upload" class="btn-primary">
+                    <i class="fas fa-upload mr-2"></i>Загрузить файл
                 </a>
-                <a href="#features" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-purple-600 transition">
-                    Узнать больше
+                <a href="#features" class="btn-secondary">
+                    Узнать подробнее
                 </a>
             </div>
-        </div>
-    </div>
 
-    <!-- Основные возможности -->
-    <section id="features" class="py-20 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h3 class="text-4xl font-bold text-center mb-16 text-gray-900">
-                Что анализирует Speech Coach?
-            </h3>
-            <div class="grid md:grid-cols-3 gap-8">
-                <!-- Карточка 1 -->
-                <div class="card-hover bg-gray-50 p-8 rounded-xl border border-gray-200">
-                    <div class="text-4xl text-purple-600 mb-4">
-                        <i class="fas fa-pause-circle"></i>
+            <!-- Демо-скриншот концепция -->
+            <div class="card-dark p-8 rounded-lg max-w-3xl mx-auto">
+                <div class="text-center" style="color: var(--text-secondary);">
+                    <div class="py-16">
+                        <i class="fas fa-chart-bar text-4xl mb-4" style="color: var(--accent);"></i>
+                        <p>Результаты анализа с интерактивными графиками и рекомендациями</p>
                     </div>
-                    <h4 class="text-xl font-bold mb-3 text-gray-900">Анализ пауз</h4>
-                    <p class="text-gray-700">
-                        Определяет структурные паузы, заполняющие паузы и длительные молчания. 
-                        Помогает оптимизировать ритм выступления.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="divider max-w-7xl mx-auto"></div>
+
+    <!-- Возможности -->
+    <section id="features" class="py-24 px-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="mb-16">
+                <h3 class="text-3xl font-bold mb-4">Полный анализ речи</h3>
+                <p style="color: var(--text-secondary);">Система анализирует более 50 параметров вашего выступления</p>
+            </div>
+
+            <div class="feature-grid">
+                <!-- Паузы -->
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-hourglass-end"></i>
+                    </div>
+                    <h4 class="text-lg font-semibold mb-2">Анализ пауз</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                        Определяет структурные паузы, заполняющие паузы и длительные молчания для оптимизации ритма.
                     </p>
                 </div>
 
-                <!-- Карточка 2 -->
-                <div class="card-hover bg-gray-50 p-8 rounded-xl border border-gray-200">
-                    <div class="text-4xl text-purple-600 mb-4">
+                <!-- Слова-паразиты -->
+                <div class="feature-card">
+                    <div class="feature-icon">
                         <i class="fas fa-language"></i>
                     </div>
-                    <h4 class="text-xl font-bold mb-3 text-gray-900">Слова-паразиты</h4>
-                    <p class="text-gray-700">
-                        Выявляет "типа", "как бы", "как говорится" и другие слова-паразиты. 
-                        Контекстный анализ помогает избежать ложных срабатываний.
+                    <h4 class="text-lg font-semibold mb-2">Слова-паразиты</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                        Выявляет "типа", "как бы", "как говорится" с контекстным анализом для исключения ложных срабатываний.
                     </p>
                 </div>
 
-                <!-- Карточка 3 -->
-                <div class="card-hover bg-gray-50 p-8 rounded-xl border border-gray-200">
-                    <div class="text-4xl text-purple-600 mb-4">
+                <!-- Темп -->
+                <div class="feature-card">
+                    <div class="feature-icon">
                         <i class="fas fa-tachometer-alt"></i>
                     </div>
-                    <h4 class="text-xl font-bold mb-3 text-gray-900">Темп речи</h4>
-                    <p class="text-gray-700">
-                        Анализирует слова в минуту, выявляет ускорения и замедления. 
-                        Предложит оптимальный темп для вашей аудитории.
+                    <h4 class="text-lg font-semibold mb-2">Темп речи</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                        Анализирует слова в минуту, выявляет ускорения и замедления для оптимального восприятия.
                     </p>
                 </div>
 
-                <!-- Карточка 4 -->
-                <div class="card-hover bg-gray-50 p-8 rounded-xl border border-gray-200">
-                    <div class="text-4xl text-purple-600 mb-4">
-                        <i class="fas fa-star"></i>
+                <!-- Интонация -->
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-wave-square"></i>
                     </div>
-                    <h4 class="text-xl font-bold mb-3 text-gray-900">Интонация</h4>
-                    <p class="text-gray-700">
-                        Выделяет акценты и выделенные фрагменты речи. 
-                        Показывает, где нужна большая выразительность.
+                    <h4 class="text-lg font-semibold mb-2">Интонация</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                        Выделяет акценты и выделенные фрагменты для анализа выразительности вашей речи.
                     </p>
                 </div>
 
-                <!-- Карточка 5 -->
-                <div class="card-hover bg-gray-50 p-8 rounded-xl border border-gray-200">
-                    <div class="text-4xl text-purple-600 mb-4">
+                <!-- Вопросы -->
+                <div class="feature-card">
+                    <div class="feature-icon">
                         <i class="fas fa-question-circle"></i>
                     </div>
-                    <h4 class="text-xl font-bold mb-3 text-gray-900">Риторические вопросы</h4>
-                    <p class="text-gray-700">
-                        Определяет вопросы в вашей речи и выявляет риторические вопросы 
-                        для анализа стилистики.
+                    <h4 class="text-lg font-semibold mb-2">Риторические вопросы</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                        Определяет вопросы и выявляет риторические вопросы для анализа стилистики выступления.
                     </p>
                 </div>
 
-                <!-- Карточка 6 -->
-                <div class="card-hover bg-gray-50 p-8 rounded-xl border border-gray-200">
-                    <div class="text-4xl text-purple-600 mb-4">
-                        <i class="fas fa-robot"></i>
+                <!-- AI-советы -->
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-brain"></i>
                     </div>
-                    <h4 class="text-xl font-bold mb-3 text-gray-900">AI-советы</h4>
-                    <p class="text-gray-700">
-                        Получайте персонализированные рекомендации от GigaChat. 
-                        Обсуждайте результаты в интерактивном чате.
+                    <h4 class="text-lg font-semibold mb-2">AI-рекомендации</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                        Получайте персонализированные советы от GigaChat и обсуждайте результаты в интерактивном чате.
                     </p>
                 </div>
             </div>
         </div>
     </section>
 
+    <div class="divider max-w-7xl mx-auto"></div>
+
     <!-- Как это работает -->
-    <section id="how-it-works" class="py-20 bg-gray-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h3 class="text-4xl font-bold text-center mb-16 text-gray-900">
-                Как это работает?
-            </h3>
-            <div class="grid md:grid-cols-4 gap-6">
+    <section id="how-it-works" class="py-24 px-6">
+        <div class="max-w-5xl mx-auto">
+            <div class="mb-16">
+                <h3 class="text-3xl font-bold mb-4">Простой процесс анализа</h3>
+                <p style="color: var(--text-secondary);">От загрузки до результатов за 4 шага</p>
+            </div>
+
+            <div class="space-y-8">
                 <!-- Шаг 1 -->
-                <div class="text-center">
-                    <div class="bg-purple-600 text-white w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
-                        1
+                <div class="flex gap-6">
+                    <div class="step-circle">1</div>
+                    <div>
+                        <h4 class="text-lg font-semibold mb-2">Загрузите файл</h4>
+                        <p style="color: var(--text-secondary);">Выберите видео или аудиофайл вашего выступления. Поддерживаются MP4, MOV, WAV, MP3 и другие популярные форматы.</p>
                     </div>
-                    <h4 class="text-lg font-bold mb-2 text-gray-900">Загрузите файл</h4>
-                    <p class="text-gray-700">Выберите видео или аудиофайл вашего выступления</p>
                 </div>
 
                 <!-- Шаг 2 -->
-                <div class="text-center">
-                    <div class="bg-purple-600 text-white w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
-                        2
+                <div class="flex gap-6">
+                    <div class="step-circle">2</div>
+                    <div>
+                        <h4 class="text-lg font-semibold mb-2">Автоматический анализ</h4>
+                        <p style="color: var(--text-secondary);">Система проанализирует вашу речь, распознает текст и выполнит детальный анализ всех параметров выступления.</p>
                     </div>
-                    <h4 class="text-lg font-bold mb-2 text-gray-900">Анализ</h4>
-                    <p class="text-gray-700">Система анализирует речь и все её параметры</p>
                 </div>
 
                 <!-- Шаг 3 -->
-                <div class="text-center">
-                    <div class="bg-purple-600 text-white w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
-                        3
+                <div class="flex gap-6">
+                    <div class="step-circle">3</div>
+                    <div>
+                        <h4 class="text-lg font-semibold mb-2">Получите результаты</h4>
+                        <p style="color: var(--text-secondary);">Просмотрите детальный отчет с графиками, метриками, временными отметками проблем и AI-рекомендациями.</p>
                     </div>
-                    <h4 class="text-lg font-bold mb-2 text-gray-900">Результаты</h4>
-                    <p class="text-gray-700">Получайте детальный отчет с метриками и рекомендациями</p>
                 </div>
 
                 <!-- Шаг 4 -->
-                <div class="text-center">
-                    <div class="bg-purple-600 text-white w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-4">
-                        4
+                <div class="flex gap-6">
+                    <div class="step-circle">4</div>
+                    <div>
+                        <h4 class="text-lg font-semibold mb-2">Обсудите с AI</h4>
+                        <p style="color: var(--text-secondary);">Задавайте вопросы об анализе в чате с AI-коучем. Получайте углубленные советы и рекомендации по улучшению.</p>
                     </div>
-                    <h4 class="text-lg font-bold mb-2 text-gray-900">Обсуждение</h4>
-                    <p class="text-gray-700">Обсуждайте результаты с AI-коучем в чате</p>
                 </div>
             </div>
         </div>
     </section>
+
+    <div class="divider max-w-7xl mx-auto"></div>
 
     <!-- Статистика -->
-    <section class="py-20 gradient-bg">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid md:grid-cols-4 gap-8 text-white text-center">
-                <div>
-                    <div class="text-5xl font-bold mb-2">50+</div>
-                    <p class="text-purple-100">Параметров анализируется</p>
+    <section id="stats" class="py-24 px-6">
+        <div class="max-w-5xl mx-auto">
+            <h3 class="text-3xl font-bold mb-16 text-center">Возможности сервиса</h3>
+
+            <div class="grid md:grid-cols-4 gap-6">
+                <div class="stat-box">
+                    <div class="stat-number">50+</div>
+                    <div class="stat-label">Параметров анализируется</div>
                 </div>
-                <div>
-                    <div class="text-5xl font-bold mb-2">100%</div>
-                    <p class="text-purple-100">Точность транскрипции</p>
+                <div class="stat-box">
+                    <div class="stat-number">&lt;1м</div>
+                    <div class="stat-label">Время анализа</div>
                 </div>
-                <div>
-                    <div class="text-5xl font-bold mb-2">&lt;30с</div>
-                    <p class="text-purple-100">Время анализа</p>
+                <div class="stat-box">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">Приватность данных</div>
                 </div>
-                <div>
-                    <div class="text-5xl font-bold mb-2">24/7</div>
-                    <p class="text-purple-100">Доступность сервиса</p>
+                <div class="stat-box">
+                    <div class="stat-number">24/7</div>
+                    <div class="stat-label">Доступность</div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- CTA -->
-    <section class="py-20 bg-white">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h3 class="text-4xl font-bold mb-6 text-gray-900">
-                Готовы улучшить вашу речь?
-            </h3>
-            <p class="text-xl text-gray-700 mb-10">
-                Начните анализ вашего выступления прямо сейчас и получите персонализированные советы от AI-коуча.
+    <div class="divider max-w-7xl mx-auto"></div>
+
+    <!-- CTA финальный -->
+    <section class="py-24 px-6">
+        <div class="max-w-3xl mx-auto text-center">
+            <h3 class="text-4xl font-bold mb-6">Готовы улучшить вашу речь?</h3>
+            <p style="color: var(--text-secondary);" class="text-lg mb-8">
+                Начните анализ прямо сейчас и получите персонализированные рекомендации от AI-коуча
             </p>
-            <a href="/upload" class="bg-purple-600 text-white px-10 py-4 rounded-lg font-semibold hover:bg-purple-700 transition inline-flex items-center text-lg">
-                <i class="fas fa-upload mr-3"></i>
-                Начать анализ
+            <a href="/upload" class="btn-primary inline-block text-lg px-8 py-3">
+                <i class="fas fa-arrow-right mr-2"></i>Загрузить файл сейчас
             </a>
         </div>
     </section>
 
     <!-- Подвал -->
-    <footer id="contact" class="bg-gray-900 text-gray-400 py-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <footer class="nav-bg border-t mt-16">
+        <div class="max-w-7xl mx-auto px-6 py-12">
             <div class="grid md:grid-cols-4 gap-8 mb-8">
                 <div>
-                    <h4 class="text-white font-bold mb-4">Speech Coach</h4>
-                    <p>Умный анализ выступлений с AI-коучингом</p>
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-6 h-6 rounded border border-white/20 flex items-center justify-center">
+                            <i class="fas fa-microphone text-xs" style="color: var(--accent);"></i>
+                        </div>
+                        <span class="font-bold">Speech Coach</span>
+                    </div>
+                    <p style="color: var(--text-secondary);" class="text-sm">Анализ выступлений с помощью AI</p>
                 </div>
                 <div>
-                    <h4 class="text-white font-bold mb-4">Функции</h4>
-                    <ul class="space-y-2">
-                        <li><a href="#features" class="hover:text-white transition">Анализ речи</a></li>
-                        <li><a href="#" class="hover:text-white transition">AI-советы</a></li>
-                        <li><a href="#" class="hover:text-white transition">Чат-поддержка</a></li>
+                    <h4 class="font-semibold mb-3 text-sm">Продукт</h4>
+                    <ul class="space-y-2 text-sm" style="color: var(--text-secondary);">
+                        <li><a href="#features">Возможности</a></li>
+                        <li><a href="#how-it-works">Как работает</a></li>
+                        <li><a href="/docs">API документация</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="text-white font-bold mb-4">Для пользователей</h4>
-                    <ul class="space-y-2">
-                        <li><a href="#" class="hover:text-white transition">Начало работы</a></li>
-                        <li><a href="#" class="hover:text-white transition">Документация</a></li>
-                        <li><a href="#" class="hover:text-white transition">FAQ</a></li>
+                    <h4 class="font-semibold mb-3 text-sm">Ресурсы</h4>
+                    <ul class="space-y-2 text-sm" style="color: var(--text-secondary);">
+                        <li><a href="#">Документация</a></li>
+                        <li><a href="#">FAQ</a></li>
+                        <li><a href="#">Контакты</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="text-white font-bold mb-4">Контакты</h4>
-                    <ul class="space-y-2">
-                        <li class="flex items-center"><i class="fas fa-envelope mr-2"></i>support@speechcoach.ai</li>
-                        <li class="flex items-center"><i class="fas fa-phone mr-2"></i>+7 (XXX) XXX-XX-XX</li>
+                    <h4 class="font-semibold mb-3 text-sm">Сообщество</h4>
+                    <ul class="space-y-2 text-sm" style="color: var(--text-secondary);">
+                        <li><a href="#">GitHub</a></li>
+                        <li><a href="#">Twitter</a></li>
+                        <li><a href="#">Discord</a></li>
                     </ul>
                 </div>
             </div>
-            <div class="border-t border-gray-800 pt-8 text-center">
-                <p>&copy; 2025 Speech Coach. Все права защищены.</p>
+            <div class="divider mb-8"></div>
+            <div class="text-center text-sm" style="color: var(--text-secondary);">
+                <p>&copy; 2025 Speech Coach. MIT License</p>
             </div>
         </div>
     </footer>
 </body>
 </html>
+
