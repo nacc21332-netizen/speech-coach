@@ -814,6 +814,12 @@
             appState.analysisType = e.target.value;
             appState.privacyAccepted = false;
             updateRadioButtonUI();
+            
+            // Show privacy modal immediately if detailed mode is selected
+            if (appState.analysisType === 'detailed') {
+                showPrivacyModal();
+            }
+            
             updateUIState();
         }
 
@@ -840,8 +846,8 @@
             UI.actionButtons.style.display = 'flex';
             
             // Enable analyze button only if:
-            // - For standard mode: always enabled
-            // - For detailed mode: privacy accepted
+            // - For standard mode: always enabled when file selected
+            // - For detailed mode: enabled only if privacy accepted
             const canAnalyze = appState.analysisType === 'standard' || appState.privacyAccepted;
             UI.analyzeBtn.disabled = !canAnalyze;
         }
@@ -882,11 +888,11 @@
                 return;
             }
 
-            if (appState.analysisType === 'detailed' && !appState.privacyAccepted) {
-                showPrivacyModal();
-                return;
-            }
+            // Proceed with analysis
+            performAnalysis();
+        }
 
+        async function performAnalysis() {
             if (appState.isAnalyzing) {
                 return;
             }
