@@ -20,6 +20,14 @@ async def lifespan(app: FastAPI):
         # Быстрая инициализация
         logger.info("⏳ Инициализация...")
 
+        # Проверка доступности модулей
+        try:
+            from app.api.deps import get_transcriber
+            transcriber = get_transcriber()
+            logger.info(f"✅ Transcriber initialization: model_available={transcriber._model_available}")
+        except Exception as e:
+            logger.warning(f"⚠️  Transcriber initialization failed: {e}")
+
         # Ленивая инициализация GigaChat (при первом запросе)
         try:
             from app.core.config import settings

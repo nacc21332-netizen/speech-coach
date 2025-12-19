@@ -93,6 +93,64 @@
         .feature-card:hover {
             background-color: rgba(88, 166, 255, 0.05);
             border-color: var(--accent);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(88, 166, 255, 0.1);
+        }
+
+        .feature-icon {
+            width: 3rem;
+            height: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            color: var(--bg-primary);
+            font-size: 1.5rem;
+        }
+
+        .step-circle {
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
+            color: var(--bg-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.25rem;
+        }
+
+        .stat-box {
+            padding: 2rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-tertiary);
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .stat-box:hover {
+            background-color: rgba(88, 166, 255, 0.05);
+            border-color: var(--accent);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
         }
 
         .divider {

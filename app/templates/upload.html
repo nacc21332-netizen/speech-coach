@@ -444,157 +444,180 @@
     </div>
 
     <script>
-        const dropZone = document.getElementById('dropZone');
-        const fileInput = document.getElementById('fileInput');
-        const fileInfo = document.getElementById('fileInfo');
-        const submitBtn = document.getElementById('submitBtn');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const uploadingState = document.getElementById('uploadingState');
-        const successState = document.getElementById('successState');
-        const privacyModal = document.getElementById('privacyModal');
-        const detailedCheckbox = document.getElementById('detailedCheckbox');
-        
-        let selectedFile = null;
-        let analysisType = 'standard'; // Default analysis type
-        let privacyModalAccepted = false; // Track if user accepted privacy modal
+        // ========== STATE MANAGEMENT ==========
+        const appState = {
+            selectedFile: null,
+            analysisType: 'standard',
+            privacyAccepted: false,
+            isAnalyzing: false
+        };
 
-        // Handle analysis type change
+        // ========== DOM ELEMENTS ==========
+        const UI = {
+            dropZone: document.getElementById('dropZone'),
+            fileInput: document.getElementById('fileInput'),
+            fileInfo: document.getElementById('fileInfo'),
+            submitBtn: document.getElementById('submitBtn'),
+            analyzeBtn: document.getElementById('analyzeBtn'),
+            uploadingState: document.getElementById('uploadingState'),
+            successState: document.getElementById('successState'),
+            privacyModal: document.getElementById('privacyModal'),
+            progressBar: document.getElementById('progressBar'),
+            progressText: document.getElementById('progressText')
+        };
+
+        // ========== EVENT LISTENERS ==========
+        UI.dropZone.addEventListener('click', () => UI.fileInput.click());
+        
+        UI.dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            UI.dropZone.classList.add('dragover');
+        });
+        
+        UI.dropZone.addEventListener('dragleave', () => {
+            UI.dropZone.classList.remove('dragover');
+        });
+        
+        UI.dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            UI.dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) handleFileSelect(files[0]);
+        });
+        
+        UI.fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFileSelect(e.target.files[0]);
+        });
+        
         document.querySelectorAll('input[name="analysisType"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
-                analysisType = e.target.value;
-                privacyModalAccepted = false; // Reset acceptance if switching types
-                
-                if (analysisType === 'detailed') {
+                appState.analysisType = e.target.value;
+                appState.privacyAccepted = false;
+                if (appState.analysisType === 'detailed') {
                     showPrivacyModal();
                 }
             });
         });
 
-        // Клик по зоне загрузки
-        dropZone.addEventListener('click', () => fileInput.click());
-
-        // Перетаскивание
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('dragover');
-        });
-
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('dragover');
-        });
-
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFileSelect(files[0]);
-            }
-        });
-
-        // Выбор файла
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFileSelect(e.target.files[0]);
-            }
-        });
-
+        // ========== FILE HANDLING ==========
         function handleFileSelect(file) {
-            selectedFile = file;
-            
-            // Проверка размера
             if (file.size > 500 * 1024 * 1024) {
                 alert('Размер файла превышает 500 МБ');
                 return;
             }
 
-            // Обновление информации о файле
+            appState.selectedFile = file;
             document.getElementById('fileName').textContent = file.name;
             document.getElementById('fileSize').textContent = formatFileSize(file.size);
             document.getElementById('fileType').textContent = file.type || 'неизвестно';
             
-            fileInfo.classList.remove('hidden');
-            analyzeBtn.disabled = false;
+            UI.fileInfo.classList.remove('hidden');
+            UI.dropZone.style.display = 'none';
+            UI.analyzeBtn.disabled = false;
+            resetProgressBar();
         }
 
         function clearFile() {
-            selectedFile = null;
-            fileInput.value = '';
-            fileInfo.classList.add('hidden');
-            submitBtn.classList.remove('hidden');
-            analyzeBtn.disabled = true;
-            uploadingState.classList.add('hidden');
-            successState.classList.add('hidden');
+            appState.selectedFile = null;
+            UI.fileInput.value = '';
+            UI.fileInfo.classList.add('hidden');
+            UI.dropZone.style.display = 'block';
+            UI.submitBtn.style.display = 'flex';
+            UI.analyzeBtn.disabled = true;
+            UI.uploadingState.classList.add('hidden');
+            UI.successState.classList.add('hidden');
+            appState.isAnalyzing = false;
+            resetProgressBar();
+        }
+
+        function resetProgressBar() {
+            UI.progressBar.style.width = '0%';
+            UI.progressText.textContent = '0%';
         }
 
         function uploadAnother() {
             clearFile();
-            dropZone.classList.remove('dragover');
-            analysisType = 'standard';
-            privacyModalAccepted = false;
+            appState.analysisType = 'standard';
+            appState.privacyAccepted = false;
             document.querySelector('input[name="analysisType"][value="standard"]').checked = true;
         }
 
+        // ========== PRIVACY MODAL ==========
         function showPrivacyModal() {
-            privacyModal.classList.add('show');
+            UI.privacyModal.classList.add('show');
         }
 
         function closePrivacyModal() {
-            privacyModal.classList.remove('show');
-            // Revert to standard analysis
-            analysisType = 'standard';
-            privacyModalAccepted = false;
+            UI.privacyModal.classList.remove('show');
+            appState.analysisType = 'standard';
+            appState.privacyAccepted = false;
             document.querySelector('input[name="analysisType"][value="standard"]').checked = true;
         }
 
         function acceptAndContinue() {
-            privacyModalAccepted = true;
-            privacyModal.classList.remove('show');
+            appState.privacyAccepted = true;
+            UI.privacyModal.classList.remove('show');
         }
 
+        // ========== ANALYSIS ==========
         async function analyzeFile() {
-            if (!selectedFile) return;
-
-            // Check if detailed analysis requires privacy acceptance
-            if (analysisType === 'detailed' && !privacyModalAccepted) {
+            if (!appState.selectedFile) return;
+            if (appState.analysisType === 'detailed' && !appState.privacyAccepted) {
                 showPrivacyModal();
                 return;
             }
 
-            // Показываем состояние загрузки
-            submitBtn.classList.add('hidden');
-            uploadingState.classList.remove('hidden');
+            appState.isAnalyzing = true;
+            UI.submitBtn.style.display = 'none';
+            UI.uploadingState.classList.remove('hidden');
 
             const formData = new FormData();
-            formData.append('file', selectedFile);
+            formData.append('file', appState.selectedFile);
 
-            // Choose endpoint based on analysis type
-            const endpoint = analysisType === 'detailed' ? '/api/analyze/detailed' : '/api/analyze';
+            const endpoint = appState.analysisType === 'detailed' ? '/api/analyze/detailed' : '/api/analyze';
 
             try {
+                // Simulate progress bar animation
+                let progress = 0;
+                const progressInterval = setInterval(() => {
+                    progress = Math.min(progress + Math.random() * 30, 90);
+                    updateProgressBar(progress);
+                }, 500);
+
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     body: formData
                 });
 
+                clearInterval(progressInterval);
+                updateProgressBar(100);
+
                 if (response.ok) {
                     const data = await response.json();
-                    // Сохраняем результаты в localStorage
                     localStorage.setItem('analysisResult', JSON.stringify(data));
-                    // Save analysis type for results page
-                    localStorage.setItem('analysisType', analysisType);
+                    localStorage.setItem('analysisType', appState.analysisType);
                     
-                    uploadingState.classList.add('hidden');
-                    successState.classList.remove('hidden');
+                    setTimeout(() => {
+                        UI.uploadingState.classList.add('hidden');
+                        UI.successState.classList.remove('hidden');
+                    }, 500);
                 } else {
                     throw new Error('Ошибка анализа: ' + response.status);
                 }
             } catch (error) {
-                console.error('Ошибка:', error);
+                console.error('Error:', error);
                 alert('Ошибка при загрузке файла: ' + error.message);
-                uploadingState.classList.add('hidden');
-                submitBtn.classList.remove('hidden');
+                UI.uploadingState.classList.add('hidden');
+                UI.submitBtn.style.display = 'flex';
+                resetProgressBar();
+            } finally {
+                appState.isAnalyzing = false;
             }
+        }
+
+        function updateProgressBar(percent) {
+            UI.progressBar.style.width = percent + '%';
+            UI.progressText.textContent = Math.round(percent) + '%';
         }
 
         function formatFileSize(bytes) {

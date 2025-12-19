@@ -38,10 +38,13 @@ def get_audio_extractor() -> AdvancedFfmpegAudioExtractor:
 @lru_cache(maxsize=1)
 def get_transcriber() -> LocalWhisperTranscriber:
     """Создает трансскрайбер (загружает модель при первом вызове)"""
-    return LocalWhisperTranscriber(
+    logger.info("Initializing transcriber...")
+    transcriber = LocalWhisperTranscriber(
         cache_dir=Path(settings.cache_dir),
         cache_ttl=settings.cache_ttl
     )
+    logger.info(f"Transcriber initialized. Model available: {transcriber._model_available}")
+    return transcriber
 
 
 @lru_cache(maxsize=1)

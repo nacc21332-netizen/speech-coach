@@ -25,6 +25,12 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# Stub/shadow files that interfere with real packages
+numpy.py
+torch.py
+tensorflow.py
+scipy.py
+
 # Virtual environments
 .venv/
 venv/

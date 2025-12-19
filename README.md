@@ -85,6 +85,39 @@ CORS_ORIGINS=http://localhost:3000
 2. Откройте issue на GitHub с подробным описанием
 3. Проверьте логи: `tail -f logs/app.log`
 
+## ⚠️ Troubleshooting
+
+### Ошибка: "The local numpy.py stub is interfering with the real numpy package"
+
+**Причина:** В корневой директории проекта существует файл `numpy.py`, который перекрывает реальный пакет numpy.
+
+**Решение:** Удалите файл `numpy.py` из корневой директории:
+```bash
+rm numpy.py
+```
+
+Затем переустановите зависимости:
+```bash
+pip install -r requirements.txt
+```
+
+Или используйте автоматическое исправление:
+```bash
+python cleanup_and_test.py
+```
+
+### Ошибка: "faster_whisper module not installed"
+
+**Решение:** Убедитесь что установлены все зависимости:
+```bash
+pip install faster-whisper ctranslate2 onnxruntime
+```
+
+Проверьте импорты:
+```bash
+python test_imports.py
+```
+
 ---
 
 **Последнее обновление:** December 19, 2025  

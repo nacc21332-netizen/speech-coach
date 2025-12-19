@@ -9,9 +9,11 @@ from app.core.config import settings
 try:
     from faster_whisper import WhisperModel
     _FASTER_WHISPER_AVAILABLE = True
-except ImportError:
+    _IMPORT_ERROR = None
+except (ImportError, ModuleNotFoundError, RuntimeError) as e:
     _FASTER_WHISPER_AVAILABLE = False
     WhisperModel = None
+    _IMPORT_ERROR = str(e)
 from app.models.transcript import Transcript, TranscriptSegment, WordTiming
 
 logger = logging.getLogger(__name__)
@@ -46,10 +48,14 @@ class LocalWhisperTranscriber:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         if not _FASTER_WHISPER_AVAILABLE:
-            logger.warning(
-                "⚠️  faster_whisper module not installed. To enable transcription features, run: "
+            error_msg = (
+                "⚠️  faster_whisper module not available. "
+                "To enable transcription features, install dependencies: "
                 "pip install faster-whisper ctranslate2 onnxruntime"
             )
+            if _IMPORT_ERROR:
+                error_msg += f"\n   Import error: {_IMPORT_ERROR}"
+            logger.warning(error_msg)
             self.model = None
             self._model_available = False
         else:
@@ -60,13 +66,13 @@ class LocalWhisperTranscriber:
                     device=self.device,
                     compute_type=self.compute_type,
                 )
-                logger.info(f"Whisper model loaded successfully")
+                logger.info(f"✅ Whisper model '{self.model_size}' loaded successfully on {self.device}")
                 self._model_available = True
             except Exception as e:
                 # If model cannot be downloaded/loaded (no internet or gated model),
                 # gracefully fall back to a no-op transcriber that returns an
                 # empty Transcript. This allows tests to run in offline CI.
-                logger.warning(f"Failed to load Whisper model '{self.model_size}': {e}")
+                logger.warning(f"❌ Failed to load Whisper model '{self.model_size}': {type(e).__name__}: {e}")
                 logger.warning("Falling back to offline dummy transcriber (no word timings).")
                 self.model = None
                 self._model_available = False
