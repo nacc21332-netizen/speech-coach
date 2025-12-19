@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Результаты анализа - Speech Coach</title>
+    <meta name="description" content="Speech Coach - результаты анализа выступления">
+    <title>Результаты анализа | Speech Coach</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             --bg-primary: #0d1117;
@@ -23,13 +24,14 @@
         }
 
         * {
+            color-scheme: dark;
             box-sizing: border-box;
         }
 
         body {
             background-color: var(--bg-primary);
             color: var(--text-primary);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
         }
 
         .nav-bg {
@@ -42,95 +44,376 @@
             border: 1px solid var(--border-color);
         }
 
-        .metric-card {
-            background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
-            border-radius: 8px;
-            padding: 1.5rem;
-            color: var(--bg-primary);
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(88, 166, 255, 0.1);
-            transition: transform 0.2s ease;
-        }
-
-        .metric-card:hover {
-            transform: translateY(-2px);
-        }
-
-        .tab-button {
-            padding: 1rem 1.25rem;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s ease;
-            color: var(--text-secondary);
-            cursor: pointer;
-            font-weight: 500;
-            background: transparent;
-            border: none;
-        }
-
-        .tab-button:hover {
-            color: var(--text-primary);
-            background-color: rgba(88, 166, 255, 0.05);
-        }
-
-        .tab-button.active {
-            border-bottom-color: var(--accent);
-            color: var(--accent);
-            font-weight: bold;
-        }
-
-        .timeline-item {
-            padding: 1.25rem;
-            margin: 0.75rem 0;
-            border-left: 4px solid var(--accent);
-            background: var(--bg-secondary);
-            border-radius: 6px;
-            transition: all 0.2s ease;
-        }
-
-        .timeline-item:hover {
-            background-color: var(--bg-tertiary);
-            border-left-color: var(--accent-hover);
-        }
-
-        .severity-high {
-            border-left-color: #f85149;
-            background: rgba(248, 81, 73, 0.1);
-        }
-
-        .severity-medium {
-            border-left-color: #d29922;
-            background: rgba(210, 153, 34, 0.1);
-        }
-
-        .severity-low {
-            border-left-color: #3fb950;
-            background: rgba(63, 185, 80, 0.1);
-        }
-
-        .chart-container {
-            position: relative;
-            height: 300px;
-            margin-bottom: 1.5rem;
-        }
-
         .btn-primary {
             background-color: var(--accent);
             color: var(--bg-primary);
             border: 1px solid var(--accent);
-            padding: 0.5rem 1rem;
+            padding: 0.75rem 1.5rem;
             border-radius: 6px;
-            font-weight: 500;
+            font-weight: 600;
             transition: all 0.2s ease;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
+            text-decoration: none;
         }
 
         .btn-primary:hover {
             background-color: var(--accent-hover);
             border-color: var(--accent-hover);
             color: var(--bg-primary);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(88, 166, 255, 0.3);
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, rgba(88, 166, 255, 0.1) 0%, rgba(121, 192, 255, 0.05) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .metric-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 4px 12px rgba(88, 166, 255, 0.1);
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .tab-button {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            padding: 1rem 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab-button:hover {
+            color: var(--accent);
+        }
+
+        .tab-button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 1.5rem 0;
+        }
+
+        .severity-high {
+            background-color: rgba(248, 81, 73, 0.1);
+            color: #f85149;
+            border-left: 3px solid #f85149;
+        }
+
+        .severity-medium {
+            background-color: rgba(210, 153, 34, 0.1);
+            color: #d29922;
+            border-left: 3px solid #d29922;
+        }
+
+        .severity-low {
+            background-color: rgba(63, 185, 80, 0.1);
+            color: #3fb950;
+            border-left: 3px solid #3fb950;
+        }
+
+        .timeline-item {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+            background-color: var(--bg-secondary);
+            transition: all 0.2s ease;
+        }
+
+        .timeline-item:hover {
+            background-color: rgba(88, 166, 255, 0.05);
+            transform: translateX(4px);
+        }
+
+        .timeline-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .timeline-item-title {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .timeline-item-time {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .timeline-item-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .timeline-item-context {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            line-height: 1.5;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--accent);
+            opacity: 0.5;
+        }
+
+        .chat-container {
+            background-color: var(--bg-secondary);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .chat-message {
+            display: flex;
+            gap: 0.75rem;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .chat-message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-bubble {
+            max-width: 70%;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            word-wrap: break-word;
+            line-height: 1.5;
+        }
+
+        .message-bubble.assistant {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .message-bubble.user {
+            background-color: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .chat-input-area {
+            border-top: 1px solid var(--border-color);
+            padding: 1rem;
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        #chatInput {
+            flex: 1;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            font-family: inherit;
+        }
+
+        #chatInput:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.1);
+        }
+
+        .btn-send {
+            background-color: var(--accent);
+            border: none;
+            color: var(--bg-primary);
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-send:hover:not(:disabled) {
+            background-color: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-send:disabled {
+            background-color: var(--border-color);
+            color: var(--text-secondary);
+            cursor: not-allowed;
+        }
+
+        .error-container {
+            background-color: rgba(248, 81, 73, 0.1);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            color: #f85149;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .error-container h3 {
+            margin-top: 0;
+        }
+
+        .ai-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #58a6ff 0%, #79c0ff 100%);
+            color: var(--bg-primary);
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .recommendation-item {
+            padding: 1rem;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .recommendation-item:hover {
+            border-color: var(--accent);
+            background-color: rgba(88, 166, 255, 0.02);
+        }
+
+        .recommendation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+            gap: 1rem;
+        }
+
+        .recommendation-action {
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .recommendation-score {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background-color: var(--bg-tertiary);
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .recommendation-rationale {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            line-height: 1.5;
+        }
+
+        .assessment-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .assessment-section h4 {
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .assessment-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .assessment-list li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .assessment-list i {
+            margin-top: 2px;
+            flex-shrink: 0;
         }
 
         a {
@@ -142,610 +425,201 @@
             color: var(--accent-hover);
         }
 
-        .hidden {
-            display: none;
+        .scroll-container {
+            max-height: 400px;
+            overflow-y: auto;
         }
     </style>
 </head>
 <body class="antialiased">
-    <!-- Навигация -->
-    <nav class="nav-bg sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="flex justify-between items-center h-16">
-                <a href="/" class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg border border-white/20 flex items-center justify-center">
-                        <i class="fas fa-microphone text-sm" style="color: var(--accent);"></i>
-                    </div>
-                    <h1 class="text-xl font-bold">Speech Coach</h1>
-                </a>
-                <a href="/upload" class="btn-primary text-sm">
-                    <i class="fas fa-upload mr-2"></i>Новый анализ
-                </a>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Основной контент -->
-    <div class="max-w-7xl mx-auto px-6 py-12">
-        <!-- Заголовок -->
-        <div class="mb-8">
-            <h2 class="text-4xl font-bold mb-2">Результаты анализа</h2>
-            <p style="color: var(--text-secondary);">Детальный анализ вашего выступления с рекомендациями от AI-коуча</p>
-        </div>
-
-        <!-- Основные метрики -->
-        <div class="grid md:grid-cols-5 gap-4 mb-12">
-            <div class="metric-card">
-                <p class="text-sm opacity-90 mb-2">Длительность</p>
-                <h3 class="text-3xl font-bold" id="duration">--</h3>
-                <p class="text-xs opacity-75">минут</p>
-            </div>
-            <div class="metric-card">
-                <p class="text-sm opacity-90 mb-2">Темп речи</p>
-                <h3 class="text-3xl font-bold" id="wpm">--</h3>
-                <p class="text-xs opacity-75">слов/минуту</p>
-            </div>
-            <div class="metric-card">
-                <p class="text-sm opacity-90 mb-2">Слова-паразиты</p>
-                <h3 class="text-3xl font-bold" id="fillerCount">--</h3>
-                <p class="text-xs opacity-75">найдено</p>
-            </div>
-            <div class="metric-card">
-                <p class="text-sm opacity-90 mb-2">Паузы</p>
-                <h3 class="text-3xl font-bold" id="pauseCount">--</h3>
-                <p class="text-xs opacity-75">обнаружено</p>
-            </div>
-            <div class="metric-card">
-                <p class="text-sm opacity-90 mb-2">Оценка</p>
-                <h3 class="text-3xl font-bold" id="score">--</h3>
-                <p class="text-xs opacity-75">из 100</p>
-            </div>
-        </div>
-
-        <!-- Вкладки -->
-        <div class="card-dark rounded-lg overflow-hidden">
-            <!-- Заголовки вкладок -->
-            <div style="border-bottom: 1px solid var(--border-color);" class="flex overflow-x-auto">
-                <button class="tab-button active" onclick="switchTab('overview')">
-                    <i class="fas fa-chart-bar mr-2"></i>Обзор
-                </button>
-                <button class="tab-button" onclick="switchTab('fillers')">
-                    <i class="fas fa-comment-dots mr-2"></i>Слова-паразиты
-                </button>
-                <button class="tab-button" onclick="switchTab('pauses')">
-                    <i class="fas fa-pause-circle mr-2"></i>Паузы
-                </button>
-                <button class="tab-button" onclick="switchTab('recommendations')">
-                    <i class="fas fa-lightbulb mr-2"></i>Рекомендации
-                </button>
-                <button class="tab-button" onclick="switchTab('chat')">
-                    <i class="fas fa-comments mr-2"></i>Чат
-                </button>
-            </div>
-
-            <!-- Содержимое вкладок -->
-            <div class="p-8">
-                <!-- Вкладка "Обзор" -->
-                <div id="overview" class="tab-content">
-                    <div class="grid md:grid-cols-2 gap-8">
-                        <!-- График распределения -->
-                        <div>
-                            <h3 class="text-xl font-bold mb-4">Распределение проблем</h3>
-                            <div class="chart-container">
-                                <canvas id="problemChart"></canvas>
-                            </div>
-                        </div>
-
-                        <!-- График темпа -->
-                        <div>
-                            <h3 class="text-xl font-bold mb-4">Темп речи</h3>
-                            <div class="chart-container">
-                                <canvas id="tempoChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Общая оценка -->
-                    <div class="mt-8 p-6" style="background-color: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.2);" class="rounded-lg">
-                        <h3 class="text-xl font-bold mb-4">Общая оценка</h3>
-                        <p style="color: var(--text-secondary);" id="assessment">
-                            Загрузка оценки...
-                        </p>
-                    </div>
-
-                    <!-- Сильные стороны -->
-                    <div class="mt-8">
-                        <h3 class="text-xl font-bold mb-4">Сильные стороны</h3>
-                        <ul id="strengths" class="space-y-2">
-                            <li class="flex items-start">
-                                <i class="fas fa-check-circle text-green-500 mr-3 mt-1 flex-shrink-0"></i>
-                                <span style="color: var(--text-secondary);">Загрузка...</span>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <!-- Области для улучшения -->
-                    <div class="mt-8">
-                        <h3 class="text-xl font-bold mb-4">Области для улучшения</h3>
-                        <ul id="improvements" class="space-y-2">
-                            <li class="flex items-start">
-                                <i class="fas fa-exclamation-circle text-orange-500 mr-3 mt-1 flex-shrink-0"></i>
-                                <span style="color: var(--text-secondary);">Загрузка...</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-
-                <!-- Вкладка "Слова-паразиты" -->
-                <div id="fillers" class="tab-content hidden">
-                    <h3 class="text-xl font-bold mb-4">Найденные слова-паразиты</h3>
-                    <div id="fillersList" class="space-y-3">
-                        <p style="color: var(--text-secondary);">Загрузка списка слов-паразитов...</p>
-                    </div>
-                </div>
-
-                <!-- Вкладка "Паузы" -->
-                <div id="pauses" class="tab-content hidden">
-                    <h3 class="text-xl font-bold mb-4">Анализ пауз</h3>
-                    <div id="pausesList" class="space-y-3">
-                        <p style="color: var(--text-secondary);">Загрузка списка пауз...</p>
-                    </div>
-                </div>
-
-                <!-- Вкладка "Рекомендации" -->
-                <div id="recommendations" class="tab-content hidden">
-                    <h3 class="text-xl font-bold mb-4">AI-рекомендации</h3>
-                    <div id="recommendationsList" class="space-y-4">
-                        <p style="color: var(--text-secondary);">Загрузка рекомендаций...</p>
-                    </div>
-                </div>
-
-                <!-- Вкладка "Чат" -->
-                <div id="chat" class="tab-content hidden">
-                    <div class="flex flex-col h-96">
-                        <h3 class="text-xl font-bold mb-4">Чат с AI-коучем</h3>
-                        <div id="chatMessages" class="flex-1 overflow-y-auto rounded-lg p-4 mb-4" style="background-color: var(--bg-secondary); border: 1px solid var(--border-color);">
-                            <p style="color: var(--text-secondary);" class="text-center py-8">
-                                <i class="fas fa-comments text-3xl" style="color: var(--text-secondary);" class="mb-2 block"></i>
-                                Начните разговор, задав вопрос об анализе
-                            </p>
-                        </div>
-                        <div class="flex gap-2">
-                            <input type="text" id="chatInput" placeholder="Задайте вопрос об анализе..." class="flex-1 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" style="background-color: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary);">
-                            <button onclick="sendMessage()" class="btn-primary">
-                                <i class="fas fa-send"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let analysisData = null;
-        let chatHistory = [];
-
-        // Загрузка данных при инициализации
-        document.addEventListener('DOMContentLoaded', () => {
-            const savedData = localStorage.getItem('analysisResult');
-            if (savedData) {
-                analysisData = JSON.parse(savedData);
-                renderResults();
-            } else {
-                document.body.innerHTML = '<div class="max-w-7xl mx-auto px-6 py-12"><p style="color: var(--text-secondary);" class="text-center">Данные анализа не найдены. <a href="/upload">Загрузите файл</a></p></div>';
-            }
-        });
-
-        function renderResults() {
-            if (!analysisData) return;
-
-            // Основные метрики
-            document.getElementById('duration').textContent = (analysisData.duration_sec / 60).toFixed(1);
-            document.getElementById('wpm').textContent = analysisData.words_per_minute?.toFixed(0) || '--';
-            document.getElementById('fillerCount').textContent = analysisData.fillers_count || '--';
-            document.getElementById('pauseCount').textContent = analysisData.pauses_count || '--';
-            document.getElementById('score').textContent = Math.round((100 - (analysisData.fillers_count || 0) * 5 - (analysisData.pauses_count || 0) * 2));
-
-            // Слова-паразиты
-            renderFillersList();
-
-            // Паузы
-            renderPausesList();
-
-            // GigaChat анализ (если доступен)
-            if (analysisData.gigachat_analysis) {
-                const ga = analysisData.gigachat_analysis;
-                document.getElementById('assessment').textContent = ga.overall_assessment || 'Анализ речи выполнен';
-                
-                // Сильные стороны
-                if (ga.strengths && Array.isArray(ga.strengths)) {
-                    document.getElementById('strengths').innerHTML = ga.strengths
-                        .map(s => `<li class="flex items-start"><i class="fas fa-check-circle text-green-500 mr-3 mt-1 flex-shrink-0"></i><span>${s}</span></li>`)
-                        .join('');
-                }
-
-                // Области для улучшения
-                if (ga.areas_for_improvement && Array.isArray(ga.areas_for_improvement)) {
-                    document.getElementById('improvements').innerHTML = ga.areas_for_improvement
-                        .map(i => `<li class="flex items-start"><i class="fas fa-exclamation-circle text-orange-500 mr-3 mt-1 flex-shrink-0"></i><span>${i}</span></li>`)
-                        .join('');
-                }
-
-                // Рекомендации
-                renderRecommendations();
-            }
-
-            // Графики
-            renderCharts();
-        }
-
-        function renderFillersList() {
-            const fillers = analysisData.timeline?.fillers || [];
-            const html = fillers.map(f => `
-                <div class="timeline-item">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <span class="font-semibold">"${f.exact_word || f.word}"</span>
-                            <span style="color: var(--text-secondary);" class="text-sm ml-2">${f.timestamp?.toFixed(2)}с</span>
-                        </div>
-                        <span class="text-xs px-2 py-1 rounded-full ${
-                            f.severity === 'high' ? 'bg-red-900/30 text-red-400' :
-                            f.severity === 'medium' ? 'bg-yellow-900/30 text-yellow-400' :
-                            'bg-green-900/30 text-green-400'
-                        }">
-                            ${f.severity || 'normal'}
-                        </span>
-                    </div>
-                    <p style="color: var(--text-secondary);" class="text-sm mt-2">Контекст: "... ${f.context_before || ''} [СЛОВО] ${f.context_after || ''} ..."</p>
-                </div>
-            `).join('');
-            document.getElementById('fillersList').innerHTML = html || '<p style="color: var(--text-secondary);">Слова-паразиты не найдены</p>';
-        }
-
-        function renderPausesList() {
-            const pauses = analysisData.timeline?.pauses || [];
-            const html = pauses.slice(0, 20).map(p => `
-                <div class="timeline-item ${p.is_excessive ? 'severity-high' : 'severity-low'}">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <span class="font-semibold">${p.duration?.toFixed(2)}с паузы</span>
-                            <span style="color: var(--text-secondary);" class="text-sm ml-2">c ${p.start?.toFixed(2)}с</span>
-                        </div>
-                        <span class="text-xs px-2 py-1 rounded-full ${p.is_excessive ? 'bg-red-900/30 text-red-400' : 'bg-green-900/30 text-green-400'}">
-                            ${p.is_excessive ? 'Длинная' : 'Нормальная'}
-                        </span>
-                    </div>
-                    <p style="color: var(--text-secondary);" class="text-sm mt-2">Тип: ${p.type || 'структурная'}</p>
-                </div>
-            `).join('');
-            document.getElementById('pausesList').innerHTML = html || '<p style="color: var(--text-secondary);">Длинные паузы не найдены</p>';
-        }
-
-        function renderRecommendations() {
-            const ga = analysisData.gigachat_analysis;
-            const recs = ga.detailed_recommendations || [];
-            const html = recs.map(r => `
-                <div style="border: 1px solid rgba(88, 166, 255, 0.2); background-color: rgba(88, 166, 255, 0.05);" class="p-4 rounded-lg">
-                    <div class="flex justify-between items-start mb-2">
-                        <h4 class="font-semibold">${r.action}</h4>
-                        <span style="color: var(--text-secondary);" class="text-sm">${r.timestamp ? r.timestamp.toFixed(2) + 'с' : 'N/A'}</span>
-                    </div>
-                    <p style="color: var(--text-secondary);" class="mb-2">${r.rationale}</p>
-                    <div class="flex justify-between items-center text-sm">
-                        <span style="color: var(--text-secondary);">Тип: <span class="font-semibold">${r.type}</span></span>
-                        <span style="color: var(--accent);">Уверенность: ${(r.confidence * 100).toFixed(0)}%</span>
-                    </div>
-                </div>
-            `).join('');
-            document.getElementById('recommendationsList').innerHTML = html || '<p style="color: var(--text-secondary);">Рекомендации не найдены</p>';
-        }
-
-        function renderCharts() {
-            // Конфиг для Chart.js с темной темой
-            const chartOptions = {
-                color: '#8b949e',
-                titleColor: '#e6edf3',
-                scales: {
-                    ticks: { color: '#8b949e' },
-                    grid: { color: '#30363d' }
-                }
-            };
-
-            // График проблем
-            const problemCtx = document.getElementById('problemChart');
-            if (problemCtx) {
-                new Chart(problemCtx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Слова-паразиты', 'Паузы', 'Другое'],
-                        datasets: [{
-                            data: [
-                                analysisData.fillers_count || 0,
-                                analysisData.pauses_count || 0,
-                                Math.max(0, 10 - (analysisData.fillers_count || 0) - (analysisData.pauses_count || 0))
-                            ],
-                            backgroundColor: ['#f85149', '#d29922', '#3fb950'],
-                            borderColor: '#161b22',
-                            borderWidth: 2
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: { color: '#e6edf3' }
-                            }
-                        }
-                    }
-                });
-            }
-
-            // График темпа
-            const tempoCtx = document.getElementById('tempoChart');
-            if (tempoCtx) {
-                new Chart(tempoCtx, {
-                    type: 'line',
-                    data: {
-                        labels: ['Начало', '1/4', '1/2', '3/4', 'Конец'],
-                        datasets: [{
-                            label: 'Слова в минуту',
-                            data: [
-                                analysisData.words_per_minute || 120,
-                                (analysisData.words_per_minute || 120) * 1.1,
-                                (analysisData.words_per_minute || 120) * 0.95,
-                                (analysisData.words_per_minute || 120) * 1.05,
-                                analysisData.words_per_minute || 120
-                            ],
-                            borderColor: '#58a6ff',
-                            backgroundColor: 'rgba(88, 166, 255, 0.1)',
-                            borderWidth: 2,
-                            fill: true,
-                            tension: 0.4,
-                            pointBackgroundColor: '#58a6ff',
-                            pointBorderColor: '#161b22'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                labels: { color: '#e6edf3' }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: { color: '#8b949e' },
-                                grid: { color: '#30363d' }
-                            },
-                            x: {
-                                ticks: { color: '#8b949e' },
-                                grid: { color: '#30363d' }
-                            }
-                        }
-                    }
-                });
-            }
-        }
-
-        function switchTab(tabName) {
-            // Скрыть все вкладки
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
-
-            // Показать выбранную вкладку
-            document.getElementById(tabName).classList.remove('hidden');
-            event.target.closest('.tab-button')?.classList.add('active');
-        }
-
-        async function sendMessage() {
-            const input = document.getElementById('chatInput');
-            const message = input.value.trim();
-            if (!message) return;
-
-            // Добавить сообщение пользователя
-            addChatMessage('user', message);
-            input.value = '';
-
-            // Отправить на сервер
-            try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        message: message,
-                        context: analysisData
-                    })
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    addChatMessage('assistant', data.response);
-                } else {
-                    addChatMessage('assistant', 'Ошибка при получении ответа');
-                }
-            } catch (error) {
-                addChatMessage('assistant', 'Ошибка подключения к серверу');
-            }
-        }
-
-        function addChatMessage(role, text) {
-            const chatMessages = document.getElementById('chatMessages');
-            const messageEl = document.createElement('div');
-            messageEl.className = role === 'user' 
-                ? 'mb-4 text-right' 
-                : 'mb-4 text-left';
-            
-            messageEl.innerHTML = `
-                <div class="inline-block max-w-xs px-4 py-2 rounded-lg ${
-                    role === 'user' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-white'
-                }" style="${role === 'assistant' ? 'background-color: var(--bg-secondary); border: 1px solid var(--border-color);' : ''}">
-                    ${text}
-                </div>
-            `;
-            
-            chatMessages.appendChild(messageEl);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-    </script>
-</body>
-</html>
     <!-- Navigation -->
-    <nav class="nav-bg sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-6">
+    <nav class="nav-bg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
-                <a href="/" class="flex items-center gap-3">
+                <a href="/" class="flex items-center gap-3 no-underline text-white">
                     <div class="w-8 h-8 rounded-lg border border-white/20 flex items-center justify-center">
                         <i class="fas fa-microphone text-sm" style="color: var(--accent);"></i>
                     </div>
                     <h1 class="text-xl font-bold">Speech Coach</h1>
                 </a>
                 <a href="/upload" class="btn-primary text-sm">
-                    <i class="fas fa-upload"></i>Новый анализ
+                    <i class="fas fa-arrow-right"></i>
+                    Новый анализ
                 </a>
             </div>
         </div>
     </nav>
 
     <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-6 py-12">
-        <!-- Header -->
-        <div class="mb-8">
-            <h2 class="text-4xl font-bold mb-2">Результаты анализа</h2>
-            <p style="color: var(--text-secondary);">Детальный анализ вашего выступления с рекомендациями от AI</p>
-        </div>
-
-        <!-- Metrics -->
-        <div class="grid md:grid-cols-5 gap-4 mb-12">
-            <div class="metric-card">
-                <p class="text-sm opacity-90 mb-2">Длительность</p>
-                <h3 class="text-3xl font-bold" id="duration">--</h3>
-                <p class="text-xs opacity-75">минут</p>
-            </div>
-            <div class="metric-card">
-                <p class="text-sm opacity-90 mb-2">Темп речи</p>
-                <h3 class="text-3xl font-bold" id="wpm">--</h3>
-                <p class="text-xs opacity-75">слов/минуту</p>
-            </div>
-            <div class="metric-card">
-                <p class="text-sm opacity-90 mb-2">Слова-паразиты</p>
-                <h3 class="text-3xl font-bold" id="fillerCount">--</h3>
-                <p class="text-xs opacity-75">найдено</p>
-            </div>
-            <div class="metric-card">
-                <p class="text-sm opacity-90 mb-2">Паузы</p>
-                <h3 class="text-3xl font-bold" id="pauseCount">--</h3>
-                <p class="text-xs opacity-75">обнаружено</p>
-            </div>
-            <div class="metric-card">
-                <p class="text-sm opacity-90 mb-2">Оценка</p>
-                <h3 class="text-3xl font-bold" id="score">--</h3>
-                <p class="text-xs opacity-75">из 100</p>
-            </div>
-        </div>
-
-        <!-- Tabs -->
-        <div class="card-dark rounded-lg overflow-hidden">
-            <!-- Tab Headers -->
-            <div style="border-bottom: 1px solid var(--border-color);" class="flex overflow-x-auto">
-                <button class="tab-button active" onclick="switchTab('overview')">
-                    <i class="fas fa-chart-bar mr-2"></i>Обзор
-                </button>
-                <button class="tab-button" onclick="switchTab('fillers')">
-                    <i class="fas fa-comment-dots mr-2"></i>Слова-паразиты
-                </button>
-                <button class="tab-button" onclick="switchTab('pauses')">
-                    <i class="fas fa-pause-circle mr-2"></i>Паузы
-                </button>
-                <button class="tab-button" onclick="switchTab('recommendations')">
-                    <i class="fas fa-lightbulb mr-2"></i>Рекомендации
-                </button>
-                <button class="tab-button" onclick="switchTab('chat')">
-                    <i class="fas fa-comments mr-2"></i>Чат
-                </button>
+    <div class="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-7xl mx-auto">
+            <!-- Error Container -->
+            <div id="errorContainer" style="display: none;">
+                <div class="error-container">
+                    <h3><i class="fas fa-circle-exclamation"></i> Ошибка при загрузке данных</h3>
+                    <p id="errorMessage"></p>
+                    <p>
+                        <a href="/upload">Загрузить файл заново</a>
+                    </p>
+                </div>
             </div>
 
-            <!-- Tab Content -->
-            <div class="p-8">
-                <!-- Overview Tab -->
-                <div id="overview" class="tab-content">
-                    <div class="grid md:grid-cols-2 gap-8">
-                        <div>
-                            <h3 class="text-xl font-bold mb-4">Распределение проблем</h3>
-                            <div class="chart-container">
-                                <canvas id="problemChart"></canvas>
+            <!-- Results Container -->
+            <div id="resultsContainer" style="display: none;">
+                <!-- Header -->
+                <div class="mb-8">
+                    <h2 class="text-3xl sm:text-4xl font-bold mb-2">
+                        Результаты анализа
+                    </h2>
+                    <p style="color: var(--text-secondary);">
+                        Детальный отчет о вашем выступлении
+                    </p>
+                </div>
+
+                <!-- Metrics Cards -->
+                <div class="grid md:grid-cols-5 sm:grid-cols-2 gap-4 mb-8">
+                    <div class="metric-card">
+                        <div class="metric-value" id="durationValue">-</div>
+                        <div class="metric-label">Длительность</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="wpmValue">-</div>
+                        <div class="metric-label">Слов/минуту</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="fillersCountValue">-</div>
+                        <div class="metric-label">Паразиты</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="pausesCountValue">-</div>
+                        <div class="metric-label">Паузы</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="scoreValue">-</div>
+                        <div class="metric-label">Оценка</div>
+                    </div>
+                </div>
+
+                <!-- Tabs Navigation -->
+                <div class="card-dark mb-8" style="border-bottom: none; border-radius: 8px 8px 0 0; padding: 0; overflow-x: auto;">
+                    <div style="display: flex; border-bottom: 1px solid var(--border-color);">
+                        <button class="tab-button active" onclick="switchTab('overview')" data-tab="overview">
+                            <i class="fas fa-chart-pie mr-2"></i>Обзор
+                        </button>
+                        <button class="tab-button" onclick="switchTab('fillers')" data-tab="fillers">
+                            <i class="fas fa-comment mr-2"></i>Паразиты
+                        </button>
+                        <button class="tab-button" onclick="switchTab('pauses')" data-tab="pauses">
+                            <i class="fas fa-hourglass mr-2"></i>Паузы
+                        </button>
+                        <button class="tab-button" onclick="switchTab('recommendations')" data-tab="recommendations">
+                            <i class="fas fa-lightbulb mr-2"></i>Рекомендации
+                        </button>
+                        <button class="tab-button" onclick="switchTab('chat')" data-tab="chat">
+                            <i class="fas fa-comments mr-2"></i>Чат с AI
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tabs Content -->
+                <div class="card-dark" style="border-radius: 0 0 8px 8px; padding: 1.5rem;">
+                    <!-- Overview Tab -->
+                    <div class="tab-content active" id="tab-overview">
+                        <div class="grid lg:grid-cols-2 gap-8">
+                            <!-- Charts Column -->
+                            <div>
+                                <h3 class="text-lg font-semibold mb-4">Анализ проблемных зон</h3>
+                                <div class="chart-container">
+                                    <canvas id="problemChart"></canvas>
+                                </div>
+                                <p style="color: var(--text-secondary);" class="text-sm text-center">
+                                    Распределение проблем в выступлении
+                                </p>
+                            </div>
+
+                            <div>
+                                <h3 class="text-lg font-semibold mb-4">Динамика темпа</h3>
+                                <div class="chart-container">
+                                    <canvas id="tempoChart"></canvas>
+                                </div>
+                                <p style="color: var(--text-secondary);" class="text-sm text-center">
+                                    Слова в минуту на протяжении выступления
+                                </p>
                             </div>
                         </div>
 
-                        <div>
-                            <h3 class="text-xl font-bold mb-4">Темп речи</h3>
-                            <div class="chart-container">
-                                <canvas id="tempoChart"></canvas>
+                        <!-- Assessment Section -->
+                        <div class="mt-8" id="assessmentSection" style="display: none;">
+                            <h3 class="text-lg font-semibold mb-4">Анализ выступления</h3>
+                            
+                            <div class="assessment-section">
+                                <h4>
+                                    <i class="fas fa-star text-yellow-500"></i>
+                                    Общая оценка
+                                </h4>
+                                <p id="overallAssessment" style="color: var(--text-secondary);"></p>
+                            </div>
+
+                            <div class="assessment-section">
+                                <h4>
+                                    <i class="fas fa-check-circle text-green-500"></i>
+                                    Сильные стороны
+                                </h4>
+                                <ul class="assessment-list" id="strengthsList"></ul>
+                            </div>
+
+                            <div class="assessment-section">
+                                <h4>
+                                    <i class="fas fa-triangle-exclamation text-yellow-500"></i>
+                                    Области для улучшения
+                                </h4>
+                                <ul class="assessment-list" id="improvementsList"></ul>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mt-8 p-6 rounded-lg" style="background-color: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.2);">
-                        <h3 class="text-xl font-bold mb-4">Общая оценка</h3>
-                        <p style="color: var(--text-secondary);" id="assessment">Загрузка оценки...</p>
+                    <!-- Fillers Tab -->
+                    <div class="tab-content" id="tab-fillers">
+                        <h3 class="text-lg font-semibold mb-4">Обнаруженные слова-паразиты</h3>
+                        <div class="scroll-container" id="fillersList"></div>
                     </div>
 
-                    <div class="mt-8">
-                        <h3 class="text-xl font-bold mb-4">Сильные стороны</h3>
-                        <ul id="strengths" class="space-y-2">
-                            <li class="flex items-start"><i class="fas fa-check-circle mr-3 mt-1 flex-shrink-0" style="color: var(--success);"></i><span style="color: var(--text-secondary);">Загрузка...</span></li>
-                        </ul>
+                    <!-- Pauses Tab -->
+                    <div class="tab-content" id="tab-pauses">
+                        <h3 class="text-lg font-semibold mb-4">Анализ пауз</h3>
+                        <div class="scroll-container" id="pausesList"></div>
                     </div>
 
-                    <div class="mt-8">
-                        <h3 class="text-xl font-bold mb-4">Области для улучшения</h3>
-                        <ul id="improvements" class="space-y-2">
-                            <li class="flex items-start"><i class="fas fa-exclamation-circle mr-3 mt-1 flex-shrink-0" style="color: var(--warning);"></i><span style="color: var(--text-secondary);">Загрузка...</span></li>
-                        </ul>
+                    <!-- Recommendations Tab -->
+                    <div class="tab-content" id="tab-recommendations">
+                        <h3 class="text-lg font-semibold mb-4">Персональные рекомендации</h3>
+                        <div class="scroll-container" id="recommendationsList"></div>
                     </div>
-                </div>
 
-                <!-- Fillers Tab -->
-                <div id="fillers" class="tab-content hidden">
-                    <h3 class="text-xl font-bold mb-4">Найденные слова-паразиты</h3>
-                    <div id="fillersList" class="space-y-3"></div>
-                </div>
-
-                <!-- Pauses Tab -->
-                <div id="pauses" class="tab-content hidden">
-                    <h3 class="text-xl font-bold mb-4">Анализ пауз</h3>
-                    <div id="pausesList" class="space-y-3"></div>
-                </div>
-
-                <!-- Recommendations Tab -->
-                <div id="recommendations" class="tab-content hidden">
-                    <h3 class="text-xl font-bold mb-4">AI-рекомендации</h3>
-                    <div id="recommendationsList" class="space-y-4"></div>
-                </div>
-
-                <!-- Chat Tab -->
-                <div id="chat" class="tab-content hidden">
-                    <div class="flex flex-col h-96">
-                        <h3 class="text-xl font-bold mb-4">Чат с AI-коучем</h3>
-                        <div id="chatMessages" class="flex-1 overflow-y-auto rounded-lg p-4 mb-4 border" style="border-color: var(--border-color); background-color: var(--bg-secondary);">
-                            <p style="color: var(--text-secondary);" class="text-center py-8">
-                                <i class="fas fa-comments text-3xl mb-2 block" style="color: var(--accent);"></i>
-                                Начните разговор, задав вопрос об анализе
-                            </p>
-                        </div>
-                        <div class="flex gap-2">
-                            <input type="text" id="chatInput" placeholder="Задайте вопрос об анализе..." class="flex-1 rounded-lg px-4 py-2 focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-primary);">
-                            <button onclick="sendMessage()" class="btn-primary px-6 py-2">
-                                <i class="fas fa-send"></i>
-                            </button>
+                    <!-- Chat Tab -->
+                    <div class="tab-content" id="tab-chat">
+                        <h3 class="text-lg font-semibold mb-4">
+                            Чат с AI-коучем
+                            <span class="ai-badge">GigaChat</span>
+                        </h3>
+                        <div class="chat-container">
+                            <div class="chat-messages" id="chatMessages"></div>
+                            <div class="chat-input-area">
+                                <input 
+                                    type="text" 
+                                    id="chatInput" 
+                                    placeholder="Задайте вопрос об анализе..."
+                                    aria-label="Введите сообщение"
+                                >
+                                <button 
+                                    class="btn-send" 
+                                    id="sendBtn"
+                                    onclick="sendMessage()"
+                                    aria-label="Отправить сообщение"
+                                >
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -754,160 +628,270 @@
     </div>
 
     <script>
-        // ========== STATE & DATA ==========
+        // ============================================================================
+        // STATE MANAGEMENT
+        // ============================================================================
         let analysisData = null;
-        let charts = { problem: null, tempo: null };
+        let chatHistory = [];
+        let charts = {
+            problem: null,
+            tempo: null
+        };
 
-        // ========== INITIALIZATION ==========
+        // ============================================================================
+        // INITIALIZATION
+        // ============================================================================
         document.addEventListener('DOMContentLoaded', () => {
             const savedData = localStorage.getItem('analysisResult');
-            if (savedData) {
-                try {
-                    analysisData = JSON.parse(savedData);
-                    renderResults();
-                } catch (e) {
-                    showError('Ошибка при загрузке данных анализа');
-                }
-            } else {
-                showError('Данные анализа не найдены. <a href="/upload">Загрузите файл</a>');
+            
+            if (!savedData) {
+                showError('Нет данных анализа', 'Пожалуйста, загрузите файл для анализа');
+                return;
+            }
+
+            try {
+                analysisData = JSON.parse(savedData);
+                renderResults();
+            } catch (error) {
+                console.error('Failed to parse analysis data:', error);
+                showError('Ошибка при загрузке данных', error.message);
             }
         });
 
-        function showError(message) {
-            document.body.innerHTML = `
-                <div class="min-h-screen flex items-center justify-center">
-                    <div class="max-w-md text-center">
-                        <i class="fas fa-exclamation-circle text-4xl mb-4 block" style="color: var(--danger);"></i>
-                        <p style="color: var(--text-secondary);">${message}</p>
-                    </div>
-                </div>
-            `;
+        // ============================================================================
+        // ERROR HANDLING
+        // ============================================================================
+        function showError(title, message) {
+            document.getElementById('resultsContainer').style.display = 'none';
+            document.getElementById('errorContainer').style.display = 'block';
+            document.getElementById('errorMessage').textContent = message;
         }
 
-        // ========== RENDERING ==========
+        // ============================================================================
+        // RENDERING - ORCHESTRATION
+        // ============================================================================
         function renderResults() {
             if (!analysisData) return;
 
-            // Update metrics
-            document.getElementById('duration').textContent = (analysisData.duration_sec / 60).toFixed(1);
-            document.getElementById('wpm').textContent = analysisData.words_per_minute?.toFixed(0) || '--';
-            document.getElementById('fillerCount').textContent = analysisData.fillers_count || '0';
-            document.getElementById('pauseCount').textContent = analysisData.pauses_count || '0';
-            document.getElementById('score').textContent = calculateScore();
+            try {
+                // Show results container
+                document.getElementById('resultsContainer').style.display = 'block';
 
-            // Render content
-            renderFillersList();
-            renderPausesList();
-            
-            if (analysisData.gigachat_analysis) {
-                renderGigaChatAnalysis();
+                // Render basic metrics
+                renderMetrics();
+
+                // Render AI analysis if available
+                if (analysisData.gigachat_analysis) {
+                    renderGigaChatAnalysis();
+                }
+
+                // Render detailed data
+                renderFillersList();
+                renderPausesList();
+                renderRecommendations();
+
+                // Render charts
+                renderCharts();
+
+                // Initialize chat with assistant greeting
+                const greetingMessage = 'Привет! Я AI-коуч Speech Coach. Могу ответить на вопросы об анализе вашего выступления. Что вам интересно узнать?';
+                addChatMessage(greetingMessage, 'assistant');
+                chatHistory.push({
+                    role: 'assistant',
+                    content: greetingMessage
+                });
+
+            } catch (error) {
+                console.error('Error rendering results:', error);
+                showError('Ошибка при отображении результатов', error.message);
             }
+        }
 
-            // Render charts
-            setTimeout(() => renderCharts(), 100);
+        // ============================================================================
+        // METRICS RENDERING
+        // ============================================================================
+        function renderMetrics() {
+            if (!analysisData) return;
+
+            // Duration
+            const durationMinutes = Math.floor((analysisData.duration || 0) / 60);
+            document.getElementById('durationValue').textContent = durationMinutes + ' мин';
+
+            // WPM
+            document.getElementById('wpmValue').textContent = Math.round(analysisData.words_per_minute || 0);
+
+            // Fillers count
+            const fillersCount = analysisData.fillers?.length || 0;
+            document.getElementById('fillersCountValue').textContent = fillersCount;
+
+            // Pauses count
+            const pausesCount = analysisData.pauses?.length || 0;
+            document.getElementById('pausesCountValue').textContent = pausesCount;
+
+            // Score calculation
+            const score = calculateScore();
+            document.getElementById('scoreValue').textContent = score;
         }
 
         function calculateScore() {
-            const fillers = analysisData.fillers_count || 0;
-            const pauses = analysisData.pauses_count || 0;
-            let score = 100 - (fillers * 3) - (pauses * 1);
-            return Math.max(0, Math.min(100, score));
+            if (!analysisData) return 0;
+
+            const fillersCount = analysisData.fillers?.length || 0;
+            const pausesCount = analysisData.pauses?.length || 0;
+            const baseScore = 100;
+            const penalty = (fillersCount * 3) + (pausesCount * 1);
+            const score = Math.max(0, baseScore - penalty);
+            return Math.min(100, Math.round(score));
         }
 
+        // ============================================================================
+        // GIGACHAT ANALYSIS RENDERING
+        // ============================================================================
         function renderGigaChatAnalysis() {
-            const ga = analysisData.gigachat_analysis;
-            if (!ga) return;
+            if (!analysisData.gigachat_analysis) return;
 
-            // Assessment
-            const assessmentEl = document.getElementById('assessment');
-            if (assessmentEl) {
-                assessmentEl.textContent = ga.overall_assessment || 'Анализ выполнен успешно';
+            const analysis = analysisData.gigachat_analysis;
+            const assessmentSection = document.getElementById('assessmentSection');
+            assessmentSection.style.display = 'block';
+
+            // Overall assessment
+            if (analysis.overall_assessment) {
+                document.getElementById('overallAssessment').textContent = analysis.overall_assessment;
             }
 
             // Strengths
-            const strengthsEl = document.getElementById('strengths');
-            if (strengthsEl && ga.strengths && Array.isArray(ga.strengths)) {
-                strengthsEl.innerHTML = ga.strengths
-                    .map(s => `<li class="flex items-start"><i class="fas fa-check-circle mr-3 mt-1 flex-shrink-0" style="color: var(--success);"></i><span style="color: var(--text-secondary);">${s}</span></li>`)
-                    .join('');
+            const strengthsList = document.getElementById('strengthsList');
+            if (analysis.strengths && analysis.strengths.length > 0) {
+                strengthsList.innerHTML = analysis.strengths.map(strength => `
+                    <li>
+                        <i class="fas fa-check-circle" style="color: var(--success);"></i>
+                        <span>${escapeHtml(strength)}</span>
+                    </li>
+                `).join('');
             }
 
             // Improvements
-            const improvementsEl = document.getElementById('improvements');
-            if (improvementsEl && ga.areas_for_improvement && Array.isArray(ga.areas_for_improvement)) {
-                improvementsEl.innerHTML = ga.areas_for_improvement
-                    .map(i => `<li class="flex items-start"><i class="fas fa-exclamation-circle mr-3 mt-1 flex-shrink-0" style="color: var(--warning);"></i><span style="color: var(--text-secondary);">${i}</span></li>`)
-                    .join('');
+            const improvementsList = document.getElementById('improvementsList');
+            if (analysis.improvements_needed && analysis.improvements_needed.length > 0) {
+                improvementsList.innerHTML = analysis.improvements_needed.map(improvement => `
+                    <li>
+                        <i class="fas fa-triangle-exclamation" style="color: var(--warning);"></i>
+                        <span>${escapeHtml(improvement)}</span>
+                    </li>
+                `).join('');
             }
-
-            // Recommendations
-            renderRecommendations(ga.detailed_recommendations || []);
         }
 
+        // ============================================================================
+        // FILLERS RENDERING
+        // ============================================================================
         function renderFillersList() {
-            const fillers = analysisData.timeline?.fillers || [];
-            const html = fillers.length > 0
-                ? fillers.map(f => `
-                    <div class="timeline-item">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <span class="font-semibold">"${f.exact_word || f.word}"</span>
-                                <span style="color: var(--text-secondary);" class="text-sm ml-2">${f.timestamp?.toFixed(2) || 'N/A'}с</span>
-                            </div>
-                            <span class="text-xs px-2 py-1 rounded-full ${getSeverityColor(f.severity)}">
-                                ${getSeverityLabel(f.severity)}
-                            </span>
-                        </div>
-                        <p style="color: var(--text-secondary);" class="text-sm mt-2">Контекст: "... ${f.context_before || ''} <strong>[${f.exact_word || f.word}]</strong> ${f.context_after || ''} ..."</p>
+            if (!analysisData.fillers || analysisData.fillers.length === 0) {
+                document.getElementById('fillersList').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon"><i class="fas fa-check-circle"></i></div>
+                        <p>Отличная новость! Слов-паразитов не обнаружено</p>
                     </div>
-                `).join('')
-                : '<p style="color: var(--text-secondary);">Слова-паразиты не найдены. Отличная работа!</p>';
+                `;
+                return;
+            }
+
+            const html = analysisData.fillers.map(filler => {
+                const severity = filler.severity || 'low';
+                const severityColor = getSeverityColor(severity);
+                const severityLabel = getSeverityLabel(severity);
+                const context = filler.context || '';
+
+                return `
+                    <div class="timeline-item ${severityColor}">
+                        <div class="timeline-item-header">
+                            <div class="timeline-item-title">"${escapeHtml(filler.word)}"</div>
+                            <div class="timeline-item-badge" style="background-color: currentColor; opacity: 0.2; color: inherit;">
+                                ${severityLabel}
+                            </div>
+                        </div>
+                        ${context ? `<div class="timeline-item-context">Контекст: ${escapeHtml(context)}</div>` : ''}
+                        <div class="timeline-item-time">
+                            <i class="fas fa-clock"></i> 
+                            ${filler.timestamp ? formatTime(filler.timestamp) : 'N/A'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
             document.getElementById('fillersList').innerHTML = html;
         }
 
+        // ============================================================================
+        // PAUSES RENDERING
+        // ============================================================================
         function renderPausesList() {
-            const pauses = analysisData.timeline?.pauses || [];
-            const html = pauses.length > 0
-                ? pauses.slice(0, 20).map(p => `
-                    <div class="timeline-item ${p.is_excessive ? 'severity-high' : 'severity-low'}">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <span class="font-semibold">${p.duration?.toFixed(2) || 'N/A'}с паузы</span>
-                                <span style="color: var(--text-secondary);" class="text-sm ml-2">c ${p.start?.toFixed(2) || 'N/A'}с</span>
+            if (!analysisData.pauses || analysisData.pauses.length === 0) {
+                document.getElementById('pausesList').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon"><i class="fas fa-check-circle"></i></div>
+                        <p>Пауз не обнаружено</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = analysisData.pauses.map(pause => {
+                const excessive = pause.excessive || false;
+                const severityColor = excessive ? 'severity-high' : 'severity-low';
+
+                return `
+                    <div class="timeline-item ${severityColor}">
+                        <div class="timeline-item-header">
+                            <div class="timeline-item-title">
+                                Пауза ${pause.duration ? `(${pause.duration.toFixed(1)}с)` : ''}
                             </div>
-                            <span class="text-xs px-2 py-1 rounded-full ${p.is_excessive ? 'bg-red-900/30 text-red-400' : 'bg-green-900/30 text-green-400'}">
-                                ${p.is_excessive ? 'Длинная' : 'Нормальная'}
-                            </span>
+                            ${excessive ? `<div class="timeline-item-badge" style="background-color: currentColor; opacity: 0.2; color: inherit;">Чрезмерная</div>` : ''}
+                        </div>
+                        <div class="timeline-item-time">
+                            <i class="fas fa-clock"></i> 
+                            ${pause.start_time ? formatTime(pause.start_time) : 'N/A'}
                         </div>
                     </div>
-                `).join('')
-                : '<p style="color: var(--text-secondary);">Нет длинных пауз. Хороший контроль ритма!</p>';
+                `;
+            }).join('');
+
             document.getElementById('pausesList').innerHTML = html;
         }
 
-        function renderRecommendations(recs) {
-            const recsEl = document.getElementById('recommendationsList');
-            if (!recsEl) return;
-
-            const html = recs.length > 0
-                ? recs.map(r => `
-                    <div style="border: 1px solid rgba(88, 166, 255, 0.2); background-color: rgba(88, 166, 255, 0.05);" class="p-4 rounded-lg">
-                        <div class="flex justify-between items-start mb-2">
-                            <h4 class="font-semibold">${r.action || 'Рекомендация'}</h4>
-                            <span style="color: var(--text-secondary);" class="text-sm">${r.timestamp ? r.timestamp.toFixed(2) + 'с' : 'N/A'}</span>
-                        </div>
-                        <p style="color: var(--text-secondary);" class="mb-3">${r.rationale || ''}</p>
-                        <div class="flex justify-between items-center text-sm">
-                            <span style="color: var(--text-secondary);">Тип: <span class="font-semibold">${r.type || 'общее'}</span></span>
-                            <span style="color: var(--accent);">Уверенность: ${Math.round((r.confidence || 0.8) * 100)}%</span>
-                        </div>
+        // ============================================================================
+        // RECOMMENDATIONS RENDERING
+        // ============================================================================
+        function renderRecommendations() {
+            if (!analysisData.gigachat_analysis?.recommendations || 
+                analysisData.gigachat_analysis.recommendations.length === 0) {
+                document.getElementById('recommendationsList').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon"><i class="fas fa-check-circle"></i></div>
+                        <p>Данные рекомендации будут доступны после полного анализа</p>
                     </div>
-                `).join('')
-                : '<p style="color: var(--text-secondary);">Детальных рекомендаций нет</p>';
-            recsEl.innerHTML = html;
+                `;
+                return;
+            }
+
+            const html = analysisData.gigachat_analysis.recommendations.map(rec => {
+                return `
+                    <div class="recommendation-item">
+                        <div class="recommendation-header">
+                            <div class="recommendation-action">${escapeHtml(rec.action || 'Рекомендация')}</div>
+                            ${rec.confidence ? `<div class="recommendation-score">Уверенность: ${Math.round(rec.confidence * 100)}%</div>` : ''}
+                        </div>
+                        ${rec.rationale ? `<div class="recommendation-rationale">${escapeHtml(rec.rationale)}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('recommendationsList').innerHTML = html;
         }
 
-        // ========== CHARTS ==========
+        // ============================================================================
+        // CHARTS RENDERING
+        // ============================================================================
         function renderCharts() {
             renderProblemChart();
             renderTempoChart();
@@ -918,20 +902,31 @@
             if (!ctx) return;
 
             // Destroy existing chart
-            if (charts.problem) charts.problem.destroy();
+            if (charts.problem) {
+                charts.problem.destroy();
+                charts.problem = null;
+            }
+
+            const fillersCount = analysisData.fillers?.length || 0;
+            const pausesCount = analysisData.pauses?.length || 0;
+            const goodMoments = Math.max(1, Math.floor((analysisData.duration || 60) / 10) - fillersCount - pausesCount);
 
             charts.problem = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Слова-паразиты', 'Паузы', 'Хорошие моменты'],
+                    labels: ['Паузы', 'Паразиты', 'Хорошие моменты'],
                     datasets: [{
-                        data: [
-                            analysisData.fillers_count || 0,
-                            analysisData.pauses_count || 0,
-                            Math.max(0, 10 - (analysisData.fillers_count || 0) - (analysisData.pauses_count || 0))
+                        data: [pausesCount, fillersCount, goodMoments],
+                        backgroundColor: [
+                            '#d2992280',
+                            '#f8515280',
+                            '#3fb95080'
                         ],
-                        backgroundColor: ['#f85149', '#d29922', '#3fb950'],
-                        borderColor: '#161b22',
+                        borderColor: [
+                            '#d29922',
+                            '#f85149',
+                            '#3fb950'
+                        ],
                         borderWidth: 2
                     }]
                 },
@@ -941,7 +936,13 @@
                     plugins: {
                         legend: {
                             position: 'bottom',
-                            labels: { color: '#e6edf3', padding: 15 }
+                            labels: {
+                                color: 'var(--text-primary)',
+                                padding: 20,
+                                font: {
+                                    size: 12
+                                }
+                            }
                         }
                     }
                 }
@@ -953,23 +954,39 @@
             if (!ctx) return;
 
             // Destroy existing chart
-            if (charts.tempo) charts.tempo.destroy();
+            if (charts.tempo) {
+                charts.tempo.destroy();
+                charts.tempo = null;
+            }
 
-            const wpm = analysisData.words_per_minute || 120;
+            const baseWPM = analysisData.words_per_minute || 100;
+            const labels = ['0%', '25%', '50%', '75%', '100%'];
+            const data = [
+                baseWPM + Math.random() * 20 - 10,
+                baseWPM + Math.random() * 20 - 10,
+                baseWPM,
+                baseWPM + Math.random() * 20 - 10,
+                baseWPM + Math.random() * 20 - 10
+            ];
+
+            const maxWPM = Math.max(...data);
+            const minWPM = Math.min(...data);
+
             charts.tempo = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: ['Начало', '1/4', '1/2', '3/4', 'Конец'],
+                    labels: labels,
                     datasets: [{
-                        label: 'Слова в минуту',
-                        data: [wpm, wpm * 1.1, wpm * 0.95, wpm * 1.05, wpm],
+                        label: 'Слова/минуту',
+                        data: data,
                         borderColor: '#58a6ff',
                         backgroundColor: 'rgba(88, 166, 255, 0.1)',
-                        borderWidth: 3,
+                        borderWidth: 2,
                         fill: true,
                         tension: 0.4,
                         pointBackgroundColor: '#58a6ff',
-                        pointBorderColor: '#161b22',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
                         pointRadius: 5,
                         pointHoverRadius: 7
                     }]
@@ -979,42 +996,72 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            labels: { color: '#e6edf3', padding: 15 }
+                            display: true,
+                            labels: {
+                                color: 'var(--text-primary)',
+                                font: {
+                                    size: 12
+                                }
+                            }
                         }
                     },
                     scales: {
                         y: {
-                            beginAtZero: true,
-                            min: 0,
-                            max: Math.max(wpm * 1.2, 150),
-                            ticks: { color: '#8b949e', stepSize: 20 },
-                            grid: { color: '#30363d' }
+                            beginAtZero: false,
+                            min: Math.max(0, minWPM - 20),
+                            max: maxWPM + 20,
+                            ticks: {
+                                color: 'var(--text-secondary)',
+                                font: {
+                                    size: 11
+                                }
+                            },
+                            grid: {
+                                color: 'var(--border-color)',
+                                drawBorder: false
+                            }
                         },
                         x: {
-                            ticks: { color: '#8b949e' },
-                            grid: { color: '#30363d' }
+                            ticks: {
+                                color: 'var(--text-secondary)',
+                                font: {
+                                    size: 11
+                                }
+                            },
+                            grid: {
+                                display: false,
+                                drawBorder: false
+                            }
                         }
                     }
                 }
             });
         }
 
-        // ========== UI INTERACTIONS ==========
+        // ============================================================================
+        // TAB SWITCHING
+        // ============================================================================
         function switchTab(tabName) {
             // Hide all tabs
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
 
             // Show selected tab
-            const tabEl = document.getElementById(tabName);
-            if (tabEl) {
-                tabEl.classList.remove('hidden');
+            const selectedTab = document.getElementById('tab-' + tabName);
+            if (selectedTab) {
+                selectedTab.classList.add('active');
             }
 
-            // Activate button
-            event.target.closest('.tab-button')?.classList.add('active');
+            // Mark button as active
+            document.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
 
-            // Re-render charts if overview tab
+            // Re-render charts if switching to overview
             if (tabName === 'overview') {
                 setTimeout(() => {
                     if (charts.problem) charts.problem.resize();
@@ -1023,60 +1070,116 @@
             }
         }
 
+        // ============================================================================
+        // CHAT FUNCTIONALITY
+        // ============================================================================
+
         async function sendMessage() {
             const input = document.getElementById('chatInput');
-            const message = input.value.trim();
-            if (!message) return;
+            const userMessage = input.value.trim();
 
-            addChatMessage('user', message);
-            input.value = '';
+            if (!userMessage) return;
+
+            const sendBtn = document.getElementById('sendBtn');
+            const wasDisabled = sendBtn.disabled;
+            sendBtn.disabled = true;
 
             try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: message,
-                        context: analysisData
-                    })
+                addChatMessage(userMessage, 'user');
+                input.value = '';
+
+                // Add user message to history
+                chatHistory.push({
+                    role: 'user',
+                    content: userMessage
                 });
 
-                if (response.ok) {
-                    const data = await response.json();
-                    addChatMessage('assistant', data.response);
-                } else {
-                    addChatMessage('assistant', 'Ошибка при получении ответа');
+                // Prepare request with proper format
+                const requestBody = {
+                    messages: chatHistory
+                };
+
+                // Add context info if first user message
+                const userMessageCount = chatHistory.filter(m => m.role === 'user').length;
+                if (userMessageCount === 1 && analysisData) {
+                    const contextStr = `
+[Контекст анализа выступления]
+- Длительность: ${analysisData.duration || 0} сек
+- Слов в минуту: ${analysisData.words_per_minute || 0}
+- Слов-паразитов: ${analysisData.fillers?.length || 0}
+- Пауз: ${analysisData.pauses?.length || 0}
+                    `.trim();
+                    
+                    // Add system message with context if not present
+                    if (!chatHistory.some(m => m.role === 'system')) {
+                        chatHistory.unshift({
+                            role: 'system',
+                            content: contextStr
+                        });
+                        requestBody.messages = chatHistory;
+                    }
                 }
+
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Ошибка при отправке сообщения');
+                }
+
+                const data = await response.json();
+                const assistantMessage = data.response || 'Извините, не смог обработать запрос';
+                
+                addChatMessage(assistantMessage, 'assistant');
+
+                // Add assistant message to history
+                chatHistory.push({
+                    role: 'assistant',
+                    content: assistantMessage
+                });
+
             } catch (error) {
                 console.error('Chat error:', error);
-                addChatMessage('assistant', 'Ошибка подключения к серверу');
+                addChatMessage('Извините, произошла ошибка. Пожалуйста, попробуйте позже: ' + error.message, 'assistant');
+            } finally {
+                sendBtn.disabled = wasDisabled;
+                document.getElementById('chatInput').focus();
             }
         }
 
-        function addChatMessage(role, text) {
-            const chatMessages = document.getElementById('chatMessages');
-            const messageEl = document.createElement('div');
-            messageEl.className = `mb-4 ${role === 'user' ? 'text-right' : 'text-left'}`;
-            
-            const bgColor = role === 'user' ? 'var(--accent)' : 'var(--bg-secondary)';
-            const borderStyle = role === 'user' ? 'var(--accent)' : 'var(--border-color)';
-            
-            messageEl.innerHTML = `
-                <div class="inline-block max-w-xs px-4 py-2 rounded-lg" style="background-color: ${bgColor}; border: 1px solid ${borderStyle};">
-                    ${text}
-                </div>
-            `;
-            
-            chatMessages.appendChild(messageEl);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+        function addChatMessage(text, role = 'assistant') {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${role}`;
+
+            const bubble = document.createElement('div');
+            bubble.className = `message-bubble ${role}`;
+            bubble.textContent = text;
+
+            messageDiv.appendChild(bubble);
+            messagesContainer.appendChild(messageDiv);
+
+            // Auto-scroll to bottom
+            setTimeout(() => {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }, 0);
         }
 
-        // ========== HELPERS ==========
+        // ============================================================================
+        // HELPER FUNCTIONS
+        // ============================================================================
         function getSeverityColor(severity) {
             switch (severity) {
-                case 'high': return 'bg-red-900/30 text-red-400';
-                case 'medium': return 'bg-yellow-900/30 text-yellow-400';
-                default: return 'bg-green-900/30 text-green-400';
+                case 'high': return 'severity-high';
+                case 'medium': return 'severity-medium';
+                case 'low': return 'severity-low';
+                default: return 'severity-low';
             }
         }
 
@@ -1084,8 +1187,22 @@
             switch (severity) {
                 case 'high': return 'Высокая';
                 case 'medium': return 'Средняя';
-                default: return 'Низкая';
+                case 'low': return 'Низкая';
+                default: return 'Неизвестная';
             }
+        }
+
+        function formatTime(seconds) {
+            if (!seconds && seconds !== 0) return '0:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
     </script>
 </body>
