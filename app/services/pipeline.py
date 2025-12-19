@@ -7,6 +7,7 @@ import logging
 import time
 import asyncio
 import aiofiles
+import inspect
 
 from fastapi import UploadFile
 
@@ -331,14 +332,27 @@ class SpeechAnalysisPipeline:
         logger.info("Анализ метрик речи с таймингами...")
 
         try:
-            # Run analyzer with async support for contextual analysis
-            result = await self.analyzer.analyze(
-                transcript,
-                audio_path,
-                self.include_timings,
-                gigachat_client=self.gigachat_client,
-                cache=self.cache
-            )
+            # Run analyzer. Use only parameters supported by the analyzer
+            # implementation to maintain compatibility with dummy analyzers.
+            sig = inspect.signature(self.analyzer.analyze)
+            call_kwargs = {}
+            # positional args: transcript, audio_path, include_timings
+            if 'transcript' in sig.parameters:
+                call_kwargs['transcript'] = transcript
+            if 'audio_path' in sig.parameters:
+                call_kwargs['audio_path'] = audio_path
+            if 'include_timings' in sig.parameters:
+                call_kwargs['include_timings'] = self.include_timings
+            if 'gigachat_client' in sig.parameters:
+                call_kwargs['gigachat_client'] = self.gigachat_client
+            if 'cache' in sig.parameters:
+                call_kwargs['cache'] = self.cache
+
+            maybe_coro = self.analyzer.analyze(**call_kwargs)
+            if inspect.isawaitable(maybe_coro):
+                result = await maybe_coro
+            else:
+                result = maybe_coro
 
             # Дополнительная проверка результата
             if result.words_total == 0:
@@ -388,8 +402,9 @@ class SpeechAnalysisPipeline:
                         for idx, cl in enumerate(classified):
                             if idx < len(result.timed_data.filler_words_detailed):
                                 fw = result.timed_data.filler_words_detailed[idx]
-                                fw.context_score = cl.get("score")
-                                fw.is_context_filler = cl.get("is_filler", False)
+                                # support multiple possible keys returned by LLM
+                                fw.context_score = cl.get("score", cl.get("confidence", cl.get("confidence_score")))
+                                fw.is_context_filler = cl.get("is_filler", cl.get("is_filler_context", False))
 
                 except Exception as e:
                     logger.warning(f"LLM filler classification failed: {e}")

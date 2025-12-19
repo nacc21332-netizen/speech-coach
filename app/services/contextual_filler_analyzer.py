@@ -15,9 +15,11 @@ class ContextualFillerAnalyzer:
         self.cache = cache
         
         # Слова-паразиты, которые требуют контекстный анализ
+        # Words that require contextual analysis (keep conservative core set)
         self.contextual_fillers = {
-            "там", "да", "вот", "ну", "как бы", "типа", "значит", 
-            "вроде", "в общем", "кстати", "собственно", "то есть"
+            "там", "да", "вот", "ну", "как бы", "типа", "значит",
+            "вроде", "в общем", "кстати", "собственно", "то есть", "наверное", "кажется",
+            "по сути", "всё-таки", "прямо"
         }
         
         # Регулярные выражения для слов-паразитов
@@ -29,6 +31,11 @@ class ContextualFillerAnalyzer:
             (r"\bвот\b", "вот"),
             (r"\bтам\b", "там"),
             (r"\bда\b", "да"),
+            (r"\bнаверное\b", "наверное"),
+            (r"\bкажется\b", "кажется"),
+            (r"\bпо сути\b", "по сути"),
+            (r"\bвсё-таки\b", "всё-таки"),
+            (r"\bпрямо\b", "прямо"),
             (r"\bкороче\b", "короче"),
             (r"\bвроде\b", "вроде"),
             (r"\bвроде бы\b", "вроде бы"),
@@ -134,11 +141,10 @@ class ContextualFillerAnalyzer:
                         timestamp=candidate["timestamp"],
                         exact_word=candidate["exact_word"],
                         confidence=candidate["confidence"],
-                        duration=candidate["duration"]
+                        duration=candidate["duration"],
+                        is_context_filler=candidate.get("is_filler", False),
+                        context_score=candidate.get("confidence", 0.0)
                     )
-                    # Устанавливаем контекстные поля
-                    timed_filler.is_context_filler = candidate.get("is_filler_context", False)
-                    timed_filler.context_score = candidate.get("score", 0.0)
                     contextual_fillers.append(timed_filler)
                 
                 # Объединяем результаты

@@ -94,6 +94,13 @@ class Settings(BaseSettings):
     # Filler detection settings
     filler_cluster_gap_sec: float = Field(default=2.0, alias="FILLER_CLUSTER_GAP_SEC")
 
+    # Emphasis detection settings
+    emphasis_window_size: int = Field(default=7, alias="EMPHASIS_WINDOW_SIZE")
+    emphasis_mad_multiplier: float = Field(default=2.5, alias="EMPHASIS_MAD_MULTIPLIER")
+    emphasis_min_duration: float = Field(default=0.05, alias="EMPHASIS_MIN_DURATION")
+    emphasis_pause_threshold: float = Field(default=0.8, alias="EMPHASIS_PAUSE_THRESHOLD")
+    emphasis_content_boost: float = Field(default=0.2, alias="EMPHASIS_CONTENT_BOOST")
+
     # LLM settings for contextual filler detection
     llm_fillers_enabled: bool = Field(default=True, alias="LLM_FILLERS_ENABLED")
     llm_fillers_max_tokens: int = Field(default=256, alias="LLM_FILLERS_MAX_TOKENS")

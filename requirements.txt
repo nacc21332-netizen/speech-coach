@@ -35,4 +35,3 @@ pyyaml
 webrtcvad
 pyannote.audio
 torch
-torch

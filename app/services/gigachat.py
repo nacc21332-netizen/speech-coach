@@ -251,14 +251,14 @@ class GigaChatClient:
                 logger.error("Failed to obtain access token for analysis request")
                 return None
 
-                        chat_url = f"{self.api_url}/chat/completions"
+            chat_url = f"{self.api_url}/chat/completions"
 
-                        request_data = {
-                                "model": self.model,
-                                "messages": [
-                                        {
-                                                "role": "system",
-                                                "content": """Ты опытный тренер по ораторскому искусству и публичным выступлениями. Твоя задача - дать глубокий и профессиональный анализ речи на основе предоставленных метрик и транскрипта. 
+            request_data = {
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": """Ты опытный тренер по ораторскому искусству и публичным выступлениям. Твоя задача - дать глубокий и профессиональный анализ речи на основе предоставленных метрик и транскрипта. 
 
 Ты должен проанализировать:
 1. Структуру и логичность выступления
@@ -293,14 +293,14 @@ class GigaChatClient:
     ],
     "confidence_score": "Число от 0 до 1, отражающее уверенность в анализе на основе полноты данных"
 }"""
-                                        },
-                                        {"role": "user", "content": prompt}
-                                ],
-                                "temperature": 0.7,
-                                # Use configured max tokens (no artificial 2000 cap)
-                                "max_tokens": int(self.max_tokens),
-                                "response_format": {"type": "json_object"},
-                        }
+                    },
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.7,
+                # Use configured max tokens (no artificial 2000 cap)
+                "max_tokens": int(self.max_tokens),
+                "response_format": {"type": "json_object"},
+            }
 
             headers = {
                 "Authorization": f"Bearer {self._access_token}",
@@ -444,14 +444,14 @@ class GigaChatClient:
         Returns enriched list of contexts with `is_filler_context` and `score`.
         """
         if not settings.llm_fillers_enabled:
-            return [dict(**c, is_filler_context=False, score=0.0) for c in contexts]
+            return [dict(**c, is_filler=False, confidence=0.0, reason="llm_disabled", suggestion=None) for c in contexts]
 
         if not self._access_token:
             try:
                 await self.authenticate()
             except GigaChatError as e:
                 logger.warning(f"Failed to authenticate for filler classification: {e}")
-                return [dict(**c, is_filler_context=False, score=0.0) for c in contexts]
+                return [dict(**c, is_filler=False, confidence=0.0) for c in contexts]
 
         import hashlib
         import json as _json
@@ -479,7 +479,7 @@ class GigaChatClient:
                     cached = None
 
             if cached is not None:
-                results.append(dict(**c, is_filler_context=cached.get("is_filler", False), score=cached.get("confidence", 0.0)))
+                results.append(dict(**c, is_filler=cached.get("is_filler", False), confidence=cached.get("confidence", 0.0)))
             else:
                 idx_map[len(to_query)] = i
                 to_query.append((key, c))
@@ -497,7 +497,21 @@ class GigaChatClient:
             "timestamp": q[1].get('timestamp', 0.0)
         } for i, q in enumerate(to_query)], ensure_ascii=False)
 
-        user_prompt = f"Оцени, являются ли слова в каждом пункте явными словами-паразитами в данном контексте. Верни JSON-массив одинаковой длины с объектами: {{index: N, is_filler: true|false, confidence: 0..1}}\n\n{items_block}"
+        # More structured, conservative instruction for contextual filler classification.
+        user_prompt = (
+            "Ты эксперт по анализу устной речи. Для каждого элемента из списка оцени, "
+            "является ли указанное слово в данном контексте словом-паразитом (лишним дисфункциональным маркером), "
+            "или выполняет дискурсивную/семантическую функцию (подтверждение, указание места, ответ и т.п.). "
+            "Будь консервативен — отмечай как слово-паразит только когда слово действительно не несет смысловой нагрузки и его удаление/замена улучшит поток речи. "
+            "Для каждой позиции верни JSON объект с полями: \n"
+            "- index: исходный индекс (целое число)\n"
+            "- is_filler: true или false\n"
+            "- confidence: число от 0 до 1 (чем выше, тем увереннее)\n"
+            "- reason: короткая фраза (1-2 предложения), почему это слово является или не является паразитом\n"
+            "- suggestion: если is_filler=true — предложи конкретную замену (короткая пауза 0.2-0.6с, связующая фраза, или конкретное слово).\n\n"
+            f"Обработай эти элементы: {items_block}\n"
+            "Верни строго корректный JSON-массив без лишних комментариев."
+        )
 
         chat_url = f"{self.api_url}/chat/completions"
         request_data = {
@@ -533,7 +547,7 @@ class GigaChatClient:
                     continue
                 else:
                     logger.error(f"GigaChat classify API error {response.status_code}: {response.text}")
-                    return [dict(**c, is_filler_context=False, score=0.0) for c in contexts]
+                    return [dict(**c, is_filler=False, confidence=0.0) for c in contexts]
             except httpx.ConnectError as e:
                 logger.warning(f"GigaChat classify connection error (attempt {attempt+1}): {e}")
                 logger.warning(f"Could not connect to GigaChat API at {chat_url}")
@@ -548,223 +562,68 @@ class GigaChatClient:
 
         if response is None:
             logger.error("GigaChat classify API failed after retries")
-            return [dict(**c, is_filler_context=False, score=0.0) for c in contexts]
+            return [dict(**c, is_filler=False, confidence=0.0) for c in contexts]
 
         try:
             body = response.json()
             if not body.get("choices"):
                 return [dict(**c, is_filler_context=False, score=0.0) for c in contexts]
-            content = body["choices"][0]["message"]["content"]
-            parsed = json.loads(content)
-            enriched_map = {}
-            for r in parsed:
-                idx = r.get("index", None)
-                if idx is None:
-                    continue
-                qpos = idx - 1
-                if qpos < 0 or qpos >= len(to_query):
-                    continue
-                key, original = to_query[qpos]
-                enriched = dict(**original, is_filler_context=bool(r.get("is_filler", False)), score=float(r.get("confidence", 0.0)))
-                enriched_map[key] = enriched
 
-            final_results = []
-            final_results.extend(results)
-            for key, c in to_query:
-                enriched = enriched_map.get(key, dict(**c, is_filler_context=False, score=0.0))
+            # Extract content from response
+            content = body.get("choices", [{}])[0].get("message", {}).get("content", "")
+            if not content:
+                return [dict(**c, is_filler_context=False, score=0.0) for c in contexts]
+
+            # Parse JSON response (handling potential malformed JSON)
+            parsed_content = self._parse_json_with_retries(content)
+            if parsed_content is None:
+                logger.warning("Failed to parse LLM response for filler classification")
+                return [dict(**c, is_filler_context=False, score=0.0) for c in contexts]
+
+            # Ensure it's a list
+            if not isinstance(parsed_content, list):
+                parsed_content = [parsed_content]
+
+            # Build result by mapping LLM responses back to original contexts
+            # Build a map of query index to original index
+            llm_results_by_index = {}
+            for llm_result in parsed_content:
+                idx = llm_result.get("index", 0)
+                if idx > 0 and idx <= len(to_query):
+                    llm_results_by_index[idx - 1] = llm_result
+
+            # Populate results for queried items and cache them
+            for query_idx, (key, c) in enumerate(to_query):
+                llm_result = llm_results_by_index.get(query_idx, {})
+                is_filler = llm_result.get("is_filler", False)
+                confidence = llm_result.get("confidence", 0.0)
+                reason = llm_result.get("reason")
+                suggestion = llm_result.get("suggestion")
+
+                result_dict = dict(**c,
+                                   is_filler=bool(is_filler),
+                                   confidence=float(confidence),
+                                   reason=reason,
+                                   suggestion=suggestion)
+                results.append(result_dict)
+
+                # Cache the result
                 if cache is not None:
                     try:
-                        cache.set_by_key(key, {"is_filler": enriched.get("is_filler_context", False), "confidence": enriched.get("score", 0.0)})
-                    except Exception:
-                        pass
-                final_results.append(enriched)
+                        cache.put_by_key(key, {
+                            "is_filler": is_filler,
+                            "confidence": confidence,
+                            "reason": reason,
+                            "suggestion": suggestion
+                        })
+                    except Exception as e:
+                        logger.debug(f"Failed to cache filler classification: {e}")
 
-            # Reassemble in the original input order
-            ordered = [None] * len(contexts)
-            r_i = 0
-            for i in range(len(contexts)):
-                ordered[i] = final_results[r_i]
-                r_i += 1
-            return ordered
+            return results
+
         except Exception as e:
-            logger.warning(f"Failed to parse filler classification response: {e}")
+            logger.warning(f"Failed to process filler classification response: {e}")
             return [dict(**c, is_filler_context=False, score=0.0) for c in contexts]
-
-    async def analyze_speech_with_timings(self, timed_result_dict: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        Отправляет результаты анализа с таймингами в GigaChat.
-        """
-        if not settings.gigachat_enabled:
-            logger.info("GigaChat detailed analysis is disabled")
-            return None
-
-
-        # Пробуем аутентифицироваться, если нужно
-        if not self._access_token:
-            try:
-                await self.authenticate()
-            except GigaChatError as e:
-                logger.warning(f"Failed to authenticate with GigaChat: {e}")
-                return None
-
-        start_time = time.time()
-
-        try:
-            prompt = self._create_detailed_analysis_prompt(timed_result_dict)
-
-            # Убедимся, что токен аутентификации действителен
-            try:
-                await self.authenticate()
-            except GigaChatError as e:
-                logger.warning(f"Failed to authenticate with GigaChat: {e}")
-                processing_time = time.time() - start_time
-                return self._create_error_response(f"Failed to authenticate: {str(e)}", processing_time)
-            
-            # Проверяем, что токен действительно установлен после аутентификации
-            if not self._access_token:
-                logger.error("Failed to obtain access token for detailed analysis request")
-                processing_time = time.time() - start_time
-                return self._create_error_response("Failed to authenticate", processing_time)
-
-            chat_url = f"{self.api_url}/chat/completions"
-            request_data = {
-                "model": self.model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": """Ты опытный тренер по ораторскому искусству и публичным выступлениям. Твоя задача - дать глубокий и профессиональный анализ речи на основе предоставленных метрик, транскрипта и точных временных меток.
-
-Ты должен проанализировать:
-1. Структуру и логичность выступления
-2. Эмоциональную окраску и убедительность
-3. Взаимодействие с аудиторией (по паузам, темпу речи)
-4. Использование профессиональной лексики
-5. Темп речи и ритмичность
-6. Наличие слов-паразитов и их влияние на восприятие
-7. Длину фраз и ясность выражения мыслей
-8. Общее впечатление от выступления
-9. Привязывай все рекомендации к конкретным секундам выступления
-10. Выявляй временные паттерны и закономерности
-11. Определяй критические моменты (поворотные точки, кульминации)
-12. Анализируй стиль речи и его уместность
-13. Оценивай предполагаемую вовлеченность аудитории по времени
-14. Составь временную шкалу улучшений с упражнениями
-
-Формат ответа: строго JSON без дополнительного текста. Все поля обязательны к заполнению, даже если данных недостаточно - дай лучшую оценку на основе доступной информации.
-
-Формат JSON:
-{
-  "overall_assessment": "Общая оценка выступления: сильные и слабые стороны, уровень подготовки, общее впечатление",
-  "strengths": [
-    "Первая сильная сторона с конкретным примером из выступления",
-    "Вторая сильная сторона с конкретным примером из выступления"
-  ],
-  "areas_for_improvement": [
-    "Первая зона роста с конкретным указанием проблемы",
-    "Вторая зона роста с конкретным указанием проблемы"
-  ],
-  "detailed_recommendations": [
-    "Конкретная рекомендация по улучшению с объяснением",
-    "Конкретная рекомендация по улучшению с объяснением"
-  ],
-  "key_insights": [
-    "Ключевой инсайт о стиле речи",
-    "Ключевой инсайт о взаимодействии с аудиторией"
-  ],
-  "confidence_score": "Число от 0 до 1, отражающее уверенность в анализе на основе полноты данных",
-  "time_based_analysis": [
-    {
-      "time_range": "Временной диапазон в секундах",
-      "observation": "Что происходит в этот момент",
-      "recommendation": "Рекомендации для этого временного диапазона"
-    }
-  ],
-  "temporal_patterns": [
-    {
-      "pattern": "Обнаруженный паттерн",
-      "time_instances": [секунды],
-      "description": "Описание паттерна"
-    }
-  ],
-  "improvement_timeline": [
-    {
-      "time_marker": "Время в секундах",
-      "improvement_area": "Область для улучшения",
-      "exercise": "Упражнение для улучшения"
-    }
-  ],
-  "critical_moments": [
-    {
-      "time": "Время в секундах",
-      "type": "Тип критического момента",
-      "description": "Описание критического момента"
-    }
-  ]
-}"""
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "temperature": 0.7,
-                "max_tokens": self.max_tokens * 2,
-                "response_format": {"type": "json_object"}
-            }
-
-            headers = {
-                "Authorization": f"Bearer {self._access_token}",
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-
-            logger.info("Sending detailed analysis request to GigaChat...")
-
-            try:
-                response = await self.client.post(chat_url, json=request_data, headers=headers)
-            except httpx.ConnectError as e:
-                logger.error(f"GigaChat API connection error: {e}")
-                logger.error(f"Could not connect to GigaChat API at {chat_url}")
-                processing_time = time.time() - start_time
-                return self._create_error_response(f"Connection error: {str(e)}", processing_time)
-
-            if response.status_code != 200:
-                logger.error(f"GigaChat API error {response.status_code}: {response.text}")
-                processing_time = time.time() - start_time
-                return self._create_error_response("GigaChat API error", processing_time)
-
-            result = response.json()
-
-            if "choices" not in result or len(result["choices"]) == 0:
-                logger.error("No choices in GigaChat response")
-                processing_time = time.time() - start_time
-                return self._create_error_response("No choices in response", processing_time)
-
-            content = result["choices"][0]["message"]["content"]
-            processing_time = time.time() - start_time
-
-            logger.info(f"GigaChat detailed analysis received in {processing_time:.1f} seconds")
-
-            # Пробуем распарсить JSON с несколькими попытками
-            parsed_content = self._parse_json_with_retries(content)
-            
-            if parsed_content is not None:
-                parsed_content["processing_time_sec"] = processing_time
-                return parsed_content
-            else:
-                logger.warning("Failed to parse GigaChat detailed response after retries")
-                logger.debug(f"Raw content: {content[:2000]}...")
-                processing_time = time.time() - start_time
-                return self._create_error_response("JSON parse error after retries", processing_time)
-
-        except httpx.ConnectError as e:
-            logger.error(f"GigaChat API connection failed: {e}")
-            processing_time = time.time() - start_time
-            return self._create_error_response(f"Connection error: {str(e)}", processing_time)
-        except Exception as e:
-            logger.error(f"Error processing GigaChat response: {e}")
-            processing_time = time.time() - start_time
-            return self._create_error_response(f"Processing error: {str(e)}", processing_time)
 
     def _create_detailed_analysis_prompt(self, timed_result: Dict[str, Any]) -> str:
         """Создает детализированный промпт для GigaChat с учетом таймингов"""
@@ -868,7 +727,7 @@ class GigaChatClient:
 
             # Уберём возможные односторонние комменты и управляющие символы
             s = re.sub(r'\s+//.*', '', s)
-            s = re.sub(r'\s+\\n', ' ', s)
+            s = re.sub(r'\\n', ' ', s)
 
             # Удаляем хвостовые запятые перед закрывающими скобками
             s = re.sub(r',\s*(?=[}\]])', '', s)

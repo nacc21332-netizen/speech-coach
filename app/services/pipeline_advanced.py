@@ -40,8 +40,8 @@ class AdvancedSpeechAnalysisPipeline(BasePipeline):
             # 2. Транскрипция с таймингами
             transcript = await self._transcribe_audio(temp_audio_path)
 
-            # 3. Продвинутый анализ с таймингами
-            result = await self.advanced_analyzer.analyze_with_timings(transcript)
+            # 3. Продвинутый анализ с таймингами (передаем путь к аудио для RMS-показателей)
+            result = await self.advanced_analyzer.analyze_with_timings(transcript, temp_audio_path)
 
             # 4. GigaChat анализ (если включен)
             if self.gigachat_client:
@@ -78,8 +78,8 @@ class AdvancedSpeechAnalysisPipeline(BasePipeline):
                     if classified:
                         for idx, cl in enumerate(classified):
                             if idx < len(result.timeline.fillers):
-                                result.timeline.fillers[idx].is_context_filler = cl.get('is_filler', False)
-                                result.timeline.fillers[idx].context_score = cl.get('score')
+                                result.timeline.fillers[idx].is_context_filler = cl.get('is_filler', cl.get('is_filler_context', False))
+                                result.timeline.fillers[idx].context_score = cl.get('score', cl.get('confidence', cl.get('confidence_score')))
                 except Exception as e:
                     logger.warning(f"LLM filler classification (advanced) failed: {e}")
 
@@ -248,54 +248,60 @@ class AdvancedSpeechAnalysisPipeline(BasePipeline):
                 f"- {emphasis.timestamp:.1f}с: {emphasis.type} - '{emphasis.description}'"
             )
 
+        # Produce a concise, structured prompt that asks for time-aligned, actionable
+        # recommendations. Ask the LLM to be conservative and avoid contradictory advice
+        # (e.g. don't both ask to keep and remove pauses without context).
         prompt = f"""
-Проанализируй это публичное выступление с учетом детализированных таймингов:
+    Пожалуйста, проанализируй выступление и верни строго корректный JSON-объект.
 
-=== ОСНОВНЫЕ МЕТРИКИ ===
-Длительность: {result.duration_sec:.1f} секунд
-Время говорения: {result.speaking_time_sec:.1f} секунд
-Темп речи: {result.words_per_minute:.1f} слов/минуту
-Слов всего: {result.words_total}
-Слов-паразитов: {len(result.timeline.fillers)} ({result.filler_words['per_100_words']:.1f} на 100 слов)
-Пауз: {len(result.timeline.pauses)}
-Фраз: {len(result.timeline.phrases)}
-Вопросов: {len(result.timeline.questions)}
-Акцентов: {len(result.timeline.emphases)}
-Проблемных моментов: {len(result.timeline.suspicious_moments)}
+    Контекст (основные метрики):
+    duration_sec: {result.duration_sec:.1f}
+    speaking_time_sec: {result.speaking_time_sec:.1f}
+    words_per_minute: {result.words_per_minute:.1f}
+    words_total: {result.words_total}
+    fillers_count: {len(result.timeline.fillers)}
+    fillers_per_100_words: {result.filler_words['per_100_words']:.1f}
+    pauses_count: {len(result.timeline.pauses)}
+    phrases_count: {len(result.timeline.phrases)}
+    questions_count: {len(result.timeline.questions)}
+    emphases_count: {len(result.timeline.emphases)}
+    problems_count: {len(result.timeline.suspicious_moments)}
 
-=== ПРОБЛЕМНЫЕ МОМЕНТЫ ===
-{chr(10).join(problems_summary) if problems_summary else "Нет критических проблем"}
+    Короткие списки примеров (если есть):
+    Problems:
+    {chr(10).join(problems_summary) if problems_summary else 'none'}
+    Fillers (examples):
+    {chr(10).join(filler_summary) if filler_summary else 'none'}
+    Long pauses (examples):
+    {chr(10).join(pause_summary) if pause_summary else 'none'}
+    Emphases (examples):
+    {chr(10).join(emphasis_summary) if emphasis_summary else 'none'}
 
-=== СЛОВА-ПАРАЗИТЫ ===
-{chr(10).join(filler_summary) if filler_summary else "Нет слов-паразитов"}
+    Требуется: вернуть JSON с полями:
+     - overall_assessment: краткая оценка (строка)
+     - strengths: массив кратких пунктов (строки)
+     - areas_for_improvement: массив кратких пунктов (строки)
+     - detailed_recommendations: массив объектов вида {
+         "timestamp":  float (секунды) | null,
+         "duration": float | null,
+         "type": one of ["pause","filler","phrasing","tempo","emphasis"],
+         "action": краткое действие (например, "сократить паузу до 0.5с", "заменить 'типа' на 'например'"),
+         "rationale": краткое объяснение, почему это поможет,
+         "confidence": 0..1
+       }
+     - key_insights: массив коротких наблюдений
+     - confidence_score: число 0..1
 
-=== ДЛИННЫЕ ПАУЗЫ ===
-{chr(10).join(pause_summary) if pause_summary else "Нет длинных пауз"}
+    Правила и требования:
+     - Будь прагматичен и избегай противоречивых советов. Если даёшь рекомендацию по паузам, уточняй какие именно (структурные vs. заполняющие).
+     - Для слов-паразитов указывай конкретную замену: короткая пауза (0.2-0.6с), связующая фраза, или удаление.
+     - Для темпа речи указывай, как менять паузы/скорость (например: "уменьшить среднюю паузу на 20%" или "увеличить паузу между ключевыми фразами до 0.8с").
+     - Для каждого совета давай короткую причину и уровень уверенности (0..1).
+     - Результат должен быть только JSON, без пояснительного текста.
 
-=== ВОПРОСЫ ===
-{chr(10).join(question_summary) if question_summary else "Нет вопросов"}
+    Транскрипт (сокращён):
+    {result.transcript[:2000]}...
 
-=== АКЦЕНТЫ ===
-{chr(10).join(emphasis_summary) if emphasis_summary else "Нет акцентов"}
-
-=== ТРАНСКРИПТ ===
-{result.transcript[:2000]}... [текст сокращен]
-
-Дай развернутый анализ, уделяя внимание:
-1. Временным паттернам (когда возникают проблемы)
-2. Распределению слов-паразитов во времени
-3. Ритму и темпу в разных частях выступления
-4. Структуре фраз и пауз
-5. Использованию вопросов и акцентов
-6. Рекомендациям по конкретным временным отрезкам
-
-Верни ответ в формате JSON с такими полями:
-- overall_assessment: общая оценка выступления
-- strengths: сильные стороны
-- areas_for_improvement: зоны роста
-- detailed_recommendations: конкретные рекомендации
-- key_insights: ключевые инсайты
-- confidence_score: уверенность анализа (0-1)
-"""
+    """
 
         return prompt

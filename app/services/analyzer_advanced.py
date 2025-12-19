@@ -5,6 +5,7 @@ import logging
 import math
 import re
 from typing import List, Dict, Any, Optional, Tuple
+from pathlib import Path
 from collections import Counter
 from dataclasses import dataclass
 
@@ -61,7 +62,7 @@ class AdvancedSpeechAnalyzer:
             "very_fast": 250
         }
 
-    async def analyze_with_timings(self, transcript: Transcript) -> TimedAnalysisResult:
+    async def analyze_with_timings(self, transcript: Transcript, audio_path: Optional[Path] = None) -> TimedAnalysisResult:
         """
         Выполняет детализированный анализ речи с полными таймингами.
         """
@@ -73,8 +74,8 @@ class AdvancedSpeechAnalyzer:
         enhanced_result = await self.base_analyzer.analyze(
             transcript, include_timings=True)
 
-        # Собираем все слова с расширенной информацией
-        advanced_words = self._create_advanced_word_timings(transcript)
+        # Собираем все слова с расширенной информацией (опционально используя аудио)
+        advanced_words = self._create_advanced_word_timings(transcript, audio_path)
 
         # Анализируем элементы речи
         fillers = self._analyze_fillers(advanced_words, transcript)
@@ -166,9 +167,26 @@ class AdvancedSpeechAnalyzer:
             }
         )
 
-    def _create_advanced_word_timings(self, transcript: Transcript) -> List[AdvancedWordTiming]:
+    def _create_advanced_word_timings(self, transcript: Transcript, audio_path: Optional[Path] = None) -> List[AdvancedWordTiming]:
         """Создает расширенные тайминги слов"""
         advanced_words = []
+
+        # Precompute audio info if available
+        audio_info = None
+        if audio_path is not None:
+            try:
+                import wave
+                import numpy as _np
+
+                wf = wave.open(str(audio_path), 'rb')
+                n_channels = wf.getnchannels()
+                sampwidth = wf.getsampwidth()
+                framerate = wf.getframerate()
+                n_frames = wf.getnframes()
+                audio_info = dict(wf=wf, n_channels=n_channels, sampwidth=sampwidth, framerate=framerate, n_frames=n_frames)
+            except Exception as e:
+                logger.warning(f"Could not read audio for RMS computation: {e}")
+                audio_info = None
 
         for i, word in enumerate(transcript.word_timings):
             # Контекст
@@ -188,6 +206,34 @@ class AdvancedSpeechAnalyzer:
 
 
 
+            # compute rms if audio available
+            word_rms = None
+            if audio_info is not None:
+                try:
+                    wf = audio_info['wf']
+                    fr = audio_info['framerate']
+                    start_frame = int(max(0, math.floor(word.start * fr)))
+                    end_frame = int(max(start_frame + 1, math.ceil(word.end * fr)))
+                    wf.setpos(start_frame)
+                    raw = wf.readframes(max(0, end_frame - start_frame))
+                    import numpy as _np
+                    if audio_info['sampwidth'] == 2:
+                        dtype = _np.int16
+                    elif audio_info['sampwidth'] == 4:
+                        dtype = _np.int32
+                    else:
+                        dtype = _np.int16
+                    arr = _np.frombuffer(raw, dtype=dtype)
+                    # if stereo, take mean across channels
+                    if audio_info['n_channels'] > 1:
+                        arr = arr.reshape(-1, audio_info['n_channels']).mean(axis=1)
+                    if arr.size > 0:
+                        word_rms = float(_np.sqrt(_np.mean(arr.astype(_np.float64) ** 2)))
+                    else:
+                        word_rms = 0.0
+                except Exception:
+                    word_rms = None
+
             advanced_words.append(AdvancedWordTiming(
                 word=word.word,
                 start=word.start,
@@ -199,7 +245,16 @@ class AdvancedSpeechAnalyzer:
                 is_hesitation=is_hesitation,
                 context_before=context_before,
                 context_after=context_after
+                ,
+                rms=word_rms
             ))
+
+        # close wave if opened
+        try:
+            if audio_info is not None and 'wf' in audio_info and audio_info['wf']:
+                audio_info['wf'].close()
+        except Exception:
+            pass
 
         return advanced_words
 
@@ -354,27 +409,80 @@ class AdvancedSpeechAnalyzer:
         """Анализирует акценты/эмоциональные моменты"""
         emphases = []
 
-        # Вычисляем средние значения для сравнения
-        durations = [w.duration for w in words if w.duration > 0]
-        avg_duration = sum(durations) / len(durations) if durations else 0.1
-        std_duration = (sum((d - avg_duration) ** 2 for d in durations) / len(durations)) ** 0.5 if durations else 0.05
+        # Use robust local-window statistics (median + MAD) to avoid global skew
+        # and to detect emphases relative to local context rather than entire speech.
+        def median(data: List[float]) -> float:
+            s = sorted(data)
+            n = len(s)
+            if n == 0:
+                return 0.0
+            mid = n // 2
+            return (s[mid] if n % 2 == 1 else (s[mid - 1] + s[mid]) / 2.0)
+
+        def mad(data: List[float], med: float) -> float:
+            return median([abs(x - med) for x in data])
+
+        # Parameters from settings
+        window_size = max(3, settings.emphasis_window_size)
+        half_win = window_size // 2
+        min_duration_for_emphasis = max(0.01, float(settings.emphasis_min_duration))
+        mad_multiplier = float(settings.emphasis_mad_multiplier)
+        pause_threshold = float(settings.emphasis_pause_threshold)
+        content_boost = float(settings.emphasis_content_boost)
 
         for i, word in enumerate(words):
-            # Проверяем на акцент по длительности слова (сравнение со средним значением)
-            if word.duration > avg_duration + std_duration:  # Слово произносится значительно дольше обычного
-                intensity = min((word.duration - avg_duration) / (std_duration * 2), 1.0) if std_duration > 0 else min(word.duration / 0.5, 1.0)
+            # Build local window
+            start_idx = max(0, i - half_win)
+            end_idx = min(len(words), i + half_win + 1)
+            local_durations = [w.duration for w in words[start_idx:end_idx] if w.duration > 0]
+
+            if not local_durations:
+                continue
+
+            loc_med = median(local_durations)
+            loc_mad = mad(local_durations, loc_med) or 1e-6
+
+            # compute local RMS median/MAD if rms values exist
+            local_rms_values = [w.rms for w in words[start_idx:end_idx] if getattr(w, 'rms', None) is not None]
+            loc_rms_med = median(local_rms_values) if local_rms_values else None
+            loc_rms_mad = mad(local_rms_values, loc_rms_med) if local_rms_values else None
+
+            # Duration-based emphasis: require both absolute minimum and relative deviation
+            if word.duration >= min_duration_for_emphasis and (word.duration - loc_med) > (mad_multiplier * loc_mad):
+                # intensity scaled by how many MADs above median (clamped)
+                z = (word.duration - loc_med) / loc_mad
+                intensity = max(0.0, min((z - mad_multiplier) / (mad_multiplier * 2.0), 1.0))  # map z roughly to 0..1
                 emphases.append(EmphasisDetail(
                     timestamp=word.start,
                     type="duration",
-                    intensity=intensity,
-                    description=f"Длительное произнесение слова '{word.word}'",
+                    intensity=round(float(intensity), 3),
+                    description=f"Длительное произнесение слова '{word.word}' (локально медиа {loc_med:.3f}s)",
                     context=self._get_context_window(words, i, -1, 1),
                     effectiveness=0.7,
                     suggestion="Используйте такие акценты для ключевых слов"
                 ))
 
-            # Проверяем на повторение
+            # Volume-based emphasis using per-word RMS if available
+            if getattr(word, 'rms', None) is not None and loc_rms_med is not None and loc_rms_mad:
+                try:
+                    if (word.rms - loc_rms_med) > (mad_multiplier * loc_rms_mad):
+                        z_r = (word.rms - loc_rms_med) / (loc_rms_mad or 1e-6)
+                        vol_intensity = max(0.0, min((z_r - mad_multiplier) / (mad_multiplier * 2.0), 1.0))
+                        emphases.append(EmphasisDetail(
+                            timestamp=word.start,
+                            type="volume",
+                            intensity=round(float(vol_intensity), 3),
+                            description=f"Повышенная громкость слова '{word.word}'",
+                            context=self._get_context_window(words, i, -1, 1),
+                            effectiveness=0.8,
+                            suggestion="Используйте контролируемую громкость для акцента"
+                        ))
+                except Exception:
+                    pass
+
+            # Repetition (adjacent duplicate) — keep but avoid duplicates
             if i > 0 and word.word.lower() == words[i-1].word.lower():
+                # Only add if not already captured by duration or other repetition
                 emphases.append(EmphasisDetail(
                     timestamp=word.start,
                     type="repetition",
@@ -385,31 +493,43 @@ class AdvancedSpeechAnalyzer:
                     suggestion="Повтор может быть эффективным, но не злоупотребляйте им"
                 ))
 
-            # Проверяем на слова, которые часто используются для усиления
+            # Content-based emphasis words (lexical cues) — only if they stand out locally
             emphasis_words = {
                 "очень": 0.6, "важно": 0.8, "критично": 0.8, "серьезно": 0.7,
-                "особенно": 0.7, "прежде": 0.7, "всего": 0.7, "именно": 0.7, "как": 0.6, "раз": 0.6, "так": 0.6, "вот": 0.6
+                "особенно": 0.7, "прежде": 0.7, "всего": 0.7, "именно": 0.7, "как": 0.6, "раз": 0.6, "так": 0.6, "вот": 0.6,
+                "разумеется": 0.7, "безусловно": 0.8, "обязательно": 0.8, "абсолютно": 0.7, "наверное": 0.5, "кажется": 0.5
             }
             if word.word.lower() in emphasis_words:
-                # Проверяем, есть ли усиление по сравнению со средним уровнем
-                duration_factor = word.duration / avg_duration if avg_duration > 0 else 1.0
-                intensity = min(0.5 + duration_factor * 0.3, 1.0)
-                
+                # content emphasis: stronger if duration is above local median or pause before
+                pause_before = 0.0
+                if i > 0:
+                    prev = words[i-1]
+                    pause_before = max(0.0, word.start - prev.end)
+
+                score = emphasis_words[word.word.lower()]
+                # boost if longer than local median or preceded by a pause
+                boost = 0.0
+                if word.duration > loc_med:
+                    boost += min((word.duration - loc_med) / max(loc_med, 0.01), 1.0)
+                if pause_before > 0.5:
+                    boost += min(pause_before / 2.0, 0.5)
+
+                intensity = min(score + content_boost * boost, 1.0)
                 emphases.append(EmphasisDetail(
                     timestamp=word.start,
                     type="content",
-                    intensity=intensity,
+                    intensity=round(float(intensity), 3),
                     description=f"Усиленное слово '{word.word}'",
                     context=self._get_context_window(words, i, -1, 1),
                     effectiveness=0.8,
                     suggestion="Хорошее использование эмоционального акцента"
                 ))
 
-            # Проверяем на начало фразы/паузу перед словом (акцент через паузу)
+            # Pause-before emphasis
             if i > 0:
                 prev_word = words[i-1]
                 pause_before = word.start - prev_word.end
-                if pause_before > 0.8:  # Длинная пауза перед словом
+                if pause_before > pause_threshold:
                     emphases.append(EmphasisDetail(
                         timestamp=word.start,
                         type="pause",
@@ -420,23 +540,16 @@ class AdvancedSpeechAnalyzer:
                         suggestion="Хорошее использование паузы для акцента"
                     ))
 
-            # Проверяем на резкое изменение темпа речи по сравнению с окружением
+            # Speed-based emphasis: check deviation from local median duration
             if i > 0 and i < len(words) - 1:
-                prev_word = words[i-1]
-                next_word = words[i+1]
-                
-                # Рассчитываем относительную скорость произнесения текущего слова
-                relative_duration = word.duration / avg_duration if avg_duration > 0 else 1.0
-                
-                # Если слово значительно короче или длиннее среднего, и отличается от соседних
-                if abs(relative_duration - 1.0) > 0.5:  # Слово в 2+ раза короче или длиннее среднего
-                    speed_type = "speed" if relative_duration < 0.7 else "duration"
-                    speed_intensity = min(abs(relative_duration - 1.0), 1.0)
-                    
+                relative = word.duration / loc_med if loc_med > 0 else 1.0
+                if relative < 0.6 or relative > 1.6:
+                    speed_type = "speed" if relative < 1.0 else "duration"
+                    speed_intensity = min(abs(relative - 1.0), 1.0)
                     emphases.append(EmphasisDetail(
                         timestamp=word.start,
                         type=speed_type,
-                        intensity=speed_intensity,
+                        intensity=round(float(speed_intensity), 3),
                         description=f"Изменение темпа речи на слове '{word.word}'",
                         context=self._get_context_window(words, i, -1, 1),
                         effectiveness=0.7,
@@ -713,21 +826,20 @@ class AdvancedSpeechAnalyzer:
     def _generate_filler_suggestions(self, filler_type: str, context: str) -> List[str]:
         """Генерирует рекомендации по словам-паразитам"""
         suggestions = []
-
         base_suggestions = {
-            "э-э": ["Замените на короткую паузу", "Сделайте глубокий вдох перед фразой"],
-            "ну": ["Используйте связующие слова: 'итак', 'таким образом'"],
-            "вот": ["Уберите это слово, оно не несет смысла"],
-            "как бы": ["Говорите увереннее, без 'как бы'"],
-            "типа": ["Замените на 'например' или 'вроде'"],
-            "то есть": ["Это слово можно опустить или заменить на 'другими словами'"]
+            "э-э": ["Замените на короткую паузу (0.2–0.6с) или тишину, если это не влияет на смысл", "Сделайте вдох перед фразой"],
+            "ну": ["Попробуйте заменить на связующую фразу ('итак', 'таким образом') или убрать, если слово не несет смысловой нагрузки"],
+            "вот": ["Если слово не несет семантики — опустите его; если выступление требует указаний, замените на 'например' или укажи конкретно"],
+            "как бы": ["Уберите 'как бы' в подготовленной речи; в репликах используйте короткую паузу"],
+            "типа": ["Замените на 'например' или формулировку с уточнением"],
+            "то есть": ["Используйте 'то есть' осознанно для пояснения; в остальных случаях опустите"]
         }
 
         if filler_type in base_suggestions:
             suggestions.extend(base_suggestions[filler_type])
 
-        suggestions.append(
-            "Практикуйтесь с таймером: говорите 2 минуты без слов-паразитов")
+        # General practical suggestion — conservative: replace by short pause OR transitional phrase.
+        suggestions.append("Практикуйте замены: короткая пауза (0.2–0.6с) или связующая фраза; избегайте добавления дополнительных пауз, если паузы уже длинные в выступлении.")
 
         return suggestions
 
